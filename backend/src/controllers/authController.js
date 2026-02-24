@@ -35,6 +35,16 @@ const sanitizeUser = (user) => ({
   isActive: user.isActive
 })
 
+const ensureDoctorLinked = (user) => {
+  if (user.role === 'doctor' && !user.doctorId) {
+    throw new AppError(
+      'El usuario medico no esta vinculado a un perfil de medico. Contacte al administrador.',
+      403,
+      'doctor_profile_not_linked'
+    )
+  }
+}
+
 const buildTokensForUser = async ({ user, oldRefreshToken, ip, userAgent, transaction }) => {
   const accessToken = signAccessToken({
     sub: user.id,
@@ -80,6 +90,7 @@ export const login = async (req, res) => {
   if (!match) {
     throw new AppError('Credenciales invalidas', 401, 'invalid_credentials')
   }
+  ensureDoctorLinked(user)
 
   const tokens = await sequelize.transaction(async (transaction) => {
     return buildTokensForUser({
@@ -117,6 +128,7 @@ export const refresh = async (req, res) => {
   if (!current || !current.user || !current.user.isActive) {
     throw new AppError('Refresh token invalido', 401, 'invalid_refresh_token')
   }
+  ensureDoctorLinked(current.user)
 
   const tokens = await sequelize.transaction(async (transaction) => {
     return buildTokensForUser({

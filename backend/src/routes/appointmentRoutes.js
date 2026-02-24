@@ -3,6 +3,7 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import { validate } from '../middlewares/validate.js'
 import { authenticateJwt } from '../middlewares/authenticateJwt.js'
 import { requireRoles } from '../middlewares/requireRoles.js'
+import { messagesLimiter } from '../middlewares/rateLimiters.js'
 import {
   createAppointment,
   listMyAppointments,
@@ -41,7 +42,7 @@ router.post(
   validate(rescheduleAppointmentSchema),
   asyncHandler(rescheduleAppointment)
 )
-router.get('/:id/messages', authenticateJwt, validate(appointmentMessagesSchema), asyncHandler(getMessagesByAppointment))
+router.get('/:id/messages', messagesLimiter, authenticateJwt, validate(appointmentMessagesSchema), asyncHandler(getMessagesByAppointment))
 router.post('/:id/messages', authenticateJwt, validate(postMessageSchema), asyncHandler(postMessageByAppointment))
 
 export default router
