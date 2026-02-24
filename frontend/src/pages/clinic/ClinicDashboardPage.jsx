@@ -3,6 +3,7 @@ import { appointmentsService, doctorsService, slotsService, specialtiesService }
 import { Card } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
+import { ActionResultModal } from '../../components/ui/ActionResultModal'
 
 const toLocalIsoDate = (date = new Date()) => {
   const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000))
@@ -65,6 +66,12 @@ export function ClinicDashboardPage () {
   const [agendaLoading, setAgendaLoading] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [feedbackModal, setFeedbackModal] = useState({
+    open: false,
+    type: 'success',
+    title: '',
+    description: ''
+  })
 
   const [doctorFilters, setDoctorFilters] = useState({
     specialtyId: '',
@@ -128,6 +135,32 @@ export function ClinicDashboardPage () {
   useEffect(() => {
     loadAppointments().catch((apiError) => setError(apiError.message))
   }, [loadAppointments])
+
+  useEffect(() => {
+    if (!message) return
+    setFeedbackModal({
+      open: true,
+      type: 'success',
+      title: 'Operacion completada',
+      description: message
+    })
+  }, [message])
+
+  useEffect(() => {
+    if (!error) return
+    setFeedbackModal({
+      open: true,
+      type: 'error',
+      title: 'No se pudo completar la operacion',
+      description: error
+    })
+  }, [error])
+
+  const closeFeedbackModal = () => {
+    setFeedbackModal((prev) => ({ ...prev, open: false }))
+    setMessage('')
+    setError('')
+  }
 
   useEffect(() => {
     if (!manualAppointment.doctorId) {
@@ -575,7 +608,7 @@ export function ClinicDashboardPage () {
     }
     try {
       await appointmentsService.create(manualAppointment)
-      setMessage('Turno manual creado en HOLD')
+      setMessage(`Turno creado para ${manualAppointment.fullName} el ${manualAppointment.date} a las ${manualAppointment.startTime.slice(0, 5)}. Quedo pendiente de pago.`)
       await loadAppointments()
     } catch (apiError) {
       setError(apiError.message)
@@ -583,9 +616,12 @@ export function ClinicDashboardPage () {
   }
 
   const cancelAppointment = async (appointmentId) => {
+    setError('')
+    setMessage('')
     try {
       await appointmentsService.cancel(appointmentId, 'cancelled_by_clinic')
       await loadAppointments()
+      setMessage('Turno cancelado correctamente por la clinica.')
     } catch (apiError) {
       setError(apiError.message)
     }
@@ -604,7 +640,7 @@ export function ClinicDashboardPage () {
         date: rescheduleDraft.date,
         startTime: rescheduleDraft.startTime
       })
-      setMessage('Turno reprogramado')
+      setMessage(`Turno reprogramado para el ${rescheduleDraft.date} a las ${rescheduleDraft.startTime.slice(0, 5)}.`)
       await loadAppointments()
     } catch (apiError) {
       setError(apiError.message)
@@ -631,7 +667,7 @@ export function ClinicDashboardPage () {
         endTime: blockDraft.endTime,
         reason: blockDraft.reason
       })
-      setMessage('Bloqueo guardado')
+      setMessage(`Bloqueo registrado para el ${blockDraft.date} de ${blockDraft.startTime} a ${blockDraft.endTime}.`)
       setBlockDraft((prev) => ({ ...prev, startTime: '', endTime: '' }))
     } catch (apiError) {
       setError(apiError.message)
@@ -1089,8 +1125,13 @@ export function ClinicDashboardPage () {
         </div>
       </Card>
 
-      {message ? <p className='text-sm text-emerald-700'>{message}</p> : null}
-      {error ? <p className='text-sm text-red-600'>{error}</p> : null}
+      <ActionResultModal
+        open={feedbackModal.open}
+        type={feedbackModal.type}
+        title={feedbackModal.title}
+        description={feedbackModal.description}
+        onClose={closeFeedbackModal}
+      />
     </div>
   )
 }

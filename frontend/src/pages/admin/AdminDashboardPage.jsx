@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Card } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
+import { ActionResultModal } from '../../components/ui/ActionResultModal'
 import { doctorsService, insurancesService, specialtiesService } from '../../api/services'
 
 const dayLabels = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab']
@@ -12,6 +13,12 @@ export function AdminDashboardPage () {
   const [doctors, setDoctors] = useState([])
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [feedbackModal, setFeedbackModal] = useState({
+    open: false,
+    type: 'success',
+    title: '',
+    description: ''
+  })
 
   const [specialtyForm, setSpecialtyForm] = useState({
     name: '',
@@ -55,18 +62,46 @@ export function AdminDashboardPage () {
     load().catch((apiError) => setError(apiError.message))
   }, [])
 
+  useEffect(() => {
+    if (!message) return
+    setFeedbackModal({
+      open: true,
+      type: 'success',
+      title: 'Operacion completada',
+      description: message
+    })
+  }, [message])
+
+  useEffect(() => {
+    if (!error) return
+    setFeedbackModal({
+      open: true,
+      type: 'error',
+      title: 'No se pudo completar la operacion',
+      description: error
+    })
+  }, [error])
+
+  const closeFeedbackModal = () => {
+    setFeedbackModal((prev) => ({ ...prev, open: false }))
+    setMessage('')
+    setError('')
+  }
+
   const handleCreateSpecialty = async (event) => {
     event.preventDefault()
     setError('')
     setMessage('')
+    const specialtyName = specialtyForm.name.trim()
+    const specialtyFee = Number(specialtyForm.fee)
     try {
       await specialtiesService.create({
         ...specialtyForm,
-        fee: Number(specialtyForm.fee)
+        fee: specialtyFee
       })
       setSpecialtyForm({ name: '', description: '', fee: 15000 })
       await load()
-      setMessage('Especialidad creada')
+      setMessage(`Se creo la especialidad "${specialtyName}" con arancel $${specialtyFee}.`)
     } catch (apiError) {
       setError(apiError.message)
     }
@@ -76,6 +111,8 @@ export function AdminDashboardPage () {
     event.preventDefault()
     setError('')
     setMessage('')
+    const doctorName = doctorForm.fullName.trim()
+    const doctorEmail = doctorForm.email.trim()
     try {
       await doctorsService.create({
         ...doctorForm,
@@ -83,7 +120,7 @@ export function AdminDashboardPage () {
       })
       setDoctorForm({ fullName: '', email: '', phone: '', dni: '', consultorio: '', specialtyId: '' })
       await load()
-      setMessage('Medico creado. Credenciales iniciales: email + DNI.')
+      setMessage(`Se creo el medico ${doctorName}. Credenciales iniciales: ${doctorEmail} + DNI.`)
     } catch (apiError) {
       setError(apiError.message)
     }
@@ -93,14 +130,16 @@ export function AdminDashboardPage () {
     event.preventDefault()
     setError('')
     setMessage('')
+    const insuranceName = insuranceForm.name.trim()
+    const discountPercent = Number(insuranceForm.discountPercent)
     try {
       await insurancesService.create({
-        name: insuranceForm.name,
-        discountPercent: Number(insuranceForm.discountPercent)
+        name: insuranceName,
+        discountPercent
       })
       setInsuranceForm({ name: '', discountPercent: 0 })
       await load()
-      setMessage('Obra social creada')
+      setMessage(`Obra social "${insuranceName}" guardada con descuento ${discountPercent}%.`)
     } catch (apiError) {
       setError(apiError.message)
     }
@@ -108,9 +147,12 @@ export function AdminDashboardPage () {
 
   const handleDeleteSpecialty = async (id) => {
     setError('')
+    setMessage('')
+    const specialtyName = specialties.find((item) => item.id === id)?.name
     try {
       await specialtiesService.remove(id)
       await load()
+      setMessage(`Se elimino la especialidad "${specialtyName || 'seleccionada'}".`)
     } catch (apiError) {
       setError(apiError.message)
     }
@@ -118,9 +160,12 @@ export function AdminDashboardPage () {
 
   const handleDeleteDoctor = async (id) => {
     setError('')
+    setMessage('')
+    const doctorName = doctors.find((item) => item.id === id)?.fullName
     try {
       await doctorsService.remove(id)
       await load()
+      setMessage(`Se elimino el medico "${doctorName || 'seleccionado'}".`)
     } catch (apiError) {
       setError(apiError.message)
     }
@@ -128,9 +173,12 @@ export function AdminDashboardPage () {
 
   const handleDeleteInsurance = async (id) => {
     setError('')
+    setMessage('')
+    const insuranceName = insurances.find((item) => item.id === id)?.name
     try {
       await insurancesService.remove(id)
       await load()
+      setMessage(`Se elimino la obra social "${insuranceName || 'seleccionada'}".`)
     } catch (apiError) {
       setError(apiError.message)
     }
@@ -172,9 +220,11 @@ export function AdminDashboardPage () {
   const saveAvailability = async () => {
     if (!availabilityDoctorId || availabilityDraft.length === 0) return
     setError('')
+    setMessage('')
+    const doctorName = doctors.find((item) => item.id === availabilityDoctorId)?.fullName
     try {
       await doctorsService.updateAvailability(availabilityDoctorId, availabilityDraft)
-      setMessage('Disponibilidad actualizada')
+      setMessage(`Disponibilidad actualizada para ${doctorName || 'el medico seleccionado'}.`)
     } catch (apiError) {
       setError(apiError.message)
     }
@@ -371,8 +421,13 @@ export function AdminDashboardPage () {
         </div>
       </Card>
 
-      {message ? <p className='text-sm text-emerald-700'>{message}</p> : null}
-      {error ? <p className='text-sm text-red-600'>{error}</p> : null}
+      <ActionResultModal
+        open={feedbackModal.open}
+        type={feedbackModal.type}
+        title={feedbackModal.title}
+        description={feedbackModal.description}
+        onClose={closeFeedbackModal}
+      />
     </div>
   )
 }

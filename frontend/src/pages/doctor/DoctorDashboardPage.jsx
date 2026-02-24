@@ -3,6 +3,7 @@ import { appointmentsService } from '../../api/services'
 import { Card } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
+import { ActionResultModal } from '../../components/ui/ActionResultModal'
 
 export function DoctorDashboardPage () {
   const [appointments, setAppointments] = useState([])
@@ -12,6 +13,12 @@ export function DoctorDashboardPage () {
   const [chatDraft, setChatDraft] = useState('')
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [feedbackModal, setFeedbackModal] = useState({
+    open: false,
+    type: 'success',
+    title: '',
+    description: ''
+  })
 
   const loadAppointments = async () => {
     const data = await appointmentsService.list({ pageSize: 50 })
@@ -21,6 +28,32 @@ export function DoctorDashboardPage () {
   useEffect(() => {
     loadAppointments().catch((apiError) => setError(apiError.message))
   }, [])
+
+  useEffect(() => {
+    if (!message) return
+    setFeedbackModal({
+      open: true,
+      type: 'success',
+      title: 'Operacion completada',
+      description: message
+    })
+  }, [message])
+
+  useEffect(() => {
+    if (!error) return
+    setFeedbackModal({
+      open: true,
+      type: 'error',
+      title: 'No se pudo completar la operacion',
+      description: error
+    })
+  }, [error])
+
+  const closeFeedbackModal = () => {
+    setFeedbackModal((prev) => ({ ...prev, open: false }))
+    setMessage('')
+    setError('')
+  }
 
   useEffect(() => {
     if (!selectedAppointmentId) {
@@ -34,10 +67,16 @@ export function DoctorDashboardPage () {
 
   const updateStatus = async (appointmentId, status) => {
     setError('')
+    setMessage('')
     try {
       await appointmentsService.update(appointmentId, { status })
       await loadAppointments()
-      setMessage('Estado de turno actualizado')
+      const labels = {
+        attended: 'atendido',
+        no_show: 'ausente',
+        cancelled: 'cancelado'
+      }
+      setMessage(`El turno fue actualizado a estado "${labels[status] || status}".`)
     } catch (apiError) {
       setError(apiError.message)
     }
@@ -46,12 +85,13 @@ export function DoctorDashboardPage () {
   const saveNotes = async () => {
     if (!selectedAppointmentId) return
     setError('')
+    setMessage('')
     try {
       await appointmentsService.update(selectedAppointmentId, {
         doctorNotes: noteDraft
       })
       await loadAppointments()
-      setMessage('Nota interna guardada')
+      setMessage('La nota interna del turno fue guardada correctamente.')
     } catch (apiError) {
       setError(apiError.message)
     }
@@ -157,8 +197,13 @@ export function DoctorDashboardPage () {
         </Card>
       </div>
 
-      {message ? <p className='text-sm text-emerald-700'>{message}</p> : null}
-      {error ? <p className='text-sm text-red-600'>{error}</p> : null}
+      <ActionResultModal
+        open={feedbackModal.open}
+        type={feedbackModal.type}
+        title={feedbackModal.title}
+        description={feedbackModal.description}
+        onClose={closeFeedbackModal}
+      />
     </div>
   )
 }

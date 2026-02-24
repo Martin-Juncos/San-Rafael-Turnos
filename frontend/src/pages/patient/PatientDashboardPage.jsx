@@ -4,6 +4,7 @@ import { appointmentsService, paymentsService } from '../../api/services'
 import { Card } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
+import { ActionResultModal } from '../../components/ui/ActionResultModal'
 
 export function PatientDashboardPage () {
   const [appointments, setAppointments] = useState([])
@@ -12,6 +13,12 @@ export function PatientDashboardPage () {
   const [chatDraft, setChatDraft] = useState('')
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [feedbackModal, setFeedbackModal] = useState({
+    open: false,
+    type: 'success',
+    title: '',
+    description: ''
+  })
 
   const load = async () => {
     const result = await appointmentsService.listMy({ pageSize: 50 })
@@ -23,6 +30,32 @@ export function PatientDashboardPage () {
   }, [])
 
   useEffect(() => {
+    if (!message) return
+    setFeedbackModal({
+      open: true,
+      type: 'success',
+      title: 'Operacion completada',
+      description: message
+    })
+  }, [message])
+
+  useEffect(() => {
+    if (!error) return
+    setFeedbackModal({
+      open: true,
+      type: 'error',
+      title: 'No se pudo completar la operacion',
+      description: error
+    })
+  }, [error])
+
+  const closeFeedbackModal = () => {
+    setFeedbackModal((prev) => ({ ...prev, open: false }))
+    setMessage('')
+    setError('')
+  }
+
+  useEffect(() => {
     if (!selectedAppointmentId) {
       setMessages([])
       return
@@ -32,12 +65,19 @@ export function PatientDashboardPage () {
       .catch((apiError) => setError(apiError.message))
   }, [selectedAppointmentId])
 
+  const describeAppointment = (item) => {
+    if (!item) return 'seleccionado'
+    return `${item.date} a las ${item.startTime.slice(0, 5)}`
+  }
+
   const cancel = async (appointmentId) => {
     setError('')
+    setMessage('')
+    const selected = appointments.find((item) => item.id === appointmentId)
     try {
       await appointmentsService.cancel(appointmentId, 'cancelled_by_patient')
       await load()
-      setMessage('Turno cancelado')
+      setMessage(`Tu turno ${describeAppointment(selected)} fue cancelado correctamente.`)
     } catch (apiError) {
       setError(apiError.message)
     }
@@ -45,10 +85,12 @@ export function PatientDashboardPage () {
 
   const confirmPendingPayment = async (appointmentId) => {
     setError('')
+    setMessage('')
+    const selected = appointments.find((item) => item.id === appointmentId)
     try {
       await paymentsService.confirmMock(appointmentId)
       await load()
-      setMessage('Pago confirmado y turno validado')
+      setMessage(`Pago acreditado. Tu turno ${describeAppointment(selected)} quedo confirmado.`)
     } catch (apiError) {
       setError(apiError.message)
     }
@@ -137,8 +179,13 @@ export function PatientDashboardPage () {
         </Card>
       </div>
 
-      {message ? <p className='text-sm text-emerald-700'>{message}</p> : null}
-      {error ? <p className='text-sm text-red-600'>{error}</p> : null}
+      <ActionResultModal
+        open={feedbackModal.open}
+        type={feedbackModal.type}
+        title={feedbackModal.title}
+        description={feedbackModal.description}
+        onClose={closeFeedbackModal}
+      />
     </div>
   )
 }
