@@ -4,29 +4,48 @@ import { Card } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
 
+const toLocalIsoDate = (date = new Date()) => {
+  const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000))
+  return local.toISOString().slice(0, 10)
+}
+
+const buildUpcomingDates = (days) => {
+  const base = new Date()
+  return Array.from({ length: days }, (_item, index) => {
+    const next = new Date(base)
+    next.setDate(base.getDate() + index)
+    return toLocalIsoDate(next)
+  })
+}
+
 export function ClinicDashboardPage () {
+  const today = useMemo(() => toLocalIsoDate(), [])
   const [specialties, setSpecialties] = useState([])
   const [doctors, setDoctors] = useState([])
   const [appointments, setAppointments] = useState([])
   const [slots, setSlots] = useState([])
+  const [manualAvailableDates, setManualAvailableDates] = useState([])
+  const [manualDateSlots, setManualDateSlots] = useState([])
+  const [manualAvailabilityLoading, setManualAvailabilityLoading] = useState(false)
+  const [manualSlotsLoading, setManualSlotsLoading] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
   const [doctorFilters, setDoctorFilters] = useState({
     specialtyId: '',
     search: '',
-    date: new Date().toISOString().slice(0, 10)
+    date: today
   })
   const [appointmentFilters, setAppointmentFilters] = useState({
     doctorId: '',
     status: '',
-    dateFrom: new Date().toISOString().slice(0, 10),
+    dateFrom: today,
     dateTo: ''
   })
   const [manualAppointment, setManualAppointment] = useState({
     doctorId: '',
     specialtyId: '',
-    date: new Date().toISOString().slice(0, 10),
+    date: today,
     startTime: '',
     fullName: '',
     dni: '',
@@ -35,12 +54,12 @@ export function ClinicDashboardPage () {
   })
   const [rescheduleDraft, setRescheduleDraft] = useState({
     appointmentId: '',
-    date: new Date().toISOString().slice(0, 10),
+    date: today,
     startTime: '09:00'
   })
   const [blockDraft, setBlockDraft] = useState({
     doctorId: '',
-    date: new Date().toISOString().slice(0, 10),
+    date: today,
     startTime: '12:00',
     endTime: '13:00',
     reason: 'Bloqueo administrativo'
@@ -75,6 +94,93 @@ export function ClinicDashboardPage () {
     loadAppointments().catch((apiError) => setError(apiError.message))
   }, [loadAppointments])
 
+  useEffect(() => {
+    if (!manualAppointment.doctorId) {
+      setManualAvailableDates([])
+      setManualDateSlots([])
+      return
+    }
+
+    let isCancelled = false
+    const loadDoctorAvailability = async () => {
+      setManualAvailabilityLoading(true)
+      setError('')
+      try {
+        const dates = buildUpcomingDates(21)
+        const results = await Promise.all(
+          dates.map(async (date) => {
+            const data = await slotsService.list({ doctorId: manualAppointment.doctorId, date })
+            return { date, count: data.slots.length }
+          })
+        )
+
+        if (isCancelled) return
+
+        const withAvailability = results.filter((item) => item.count > 0)
+        setManualAvailableDates(withAvailability)
+
+        if (withAvailability.length === 0) {
+          setManualDateSlots([])
+          setManualAppointment((prev) => ({ ...prev, startTime: '' }))
+          return
+        }
+
+        setManualAppointment((prev) => ({
+          ...prev,
+          date: withAvailability[0].date,
+          startTime: ''
+        }))
+      } catch (apiError) {
+        if (!isCancelled) setError(apiError.message)
+      } finally {
+        if (!isCancelled) setManualAvailabilityLoading(false)
+      }
+    }
+
+    loadDoctorAvailability().catch(() => {})
+    return () => {
+      isCancelled = true
+    }
+  }, [manualAppointment.doctorId])
+
+  useEffect(() => {
+    if (!manualAppointment.doctorId || !manualAppointment.date) {
+      setManualDateSlots([])
+      return
+    }
+
+    let isCancelled = false
+    const loadManualDateSlots = async () => {
+      setManualSlotsLoading(true)
+      try {
+        const data = await slotsService.list({
+          doctorId: manualAppointment.doctorId,
+          date: manualAppointment.date
+        })
+        if (isCancelled) return
+        setManualDateSlots(data.slots)
+        setManualAppointment((prev) => {
+          const exists = data.slots.some((slot) => slot.startTime === prev.startTime)
+          return exists
+            ? prev
+            : {
+                ...prev,
+                startTime: data.slots[0]?.startTime || ''
+              }
+        })
+      } catch (apiError) {
+        if (!isCancelled) setError(apiError.message)
+      } finally {
+        if (!isCancelled) setManualSlotsLoading(false)
+      }
+    }
+
+    loadManualDateSlots().catch(() => {})
+    return () => {
+      isCancelled = true
+    }
+  }, [manualAppointment.doctorId, manualAppointment.date])
+
   const loadSlots = async () => {
     if (!doctorFilters.date || !appointmentFilters.doctorId) return
     try {
@@ -92,10 +198,22 @@ export function ClinicDashboardPage () {
     return specialties.find((item) => item.id === doctorFilters.specialtyId)?.name || 'Todas'
   }, [doctorFilters.specialtyId, specialties])
 
+  const formatDateLabel = (value) => {
+    return new Date(`${value}T00:00:00`).toLocaleDateString('es-AR', {
+      weekday: 'short',
+      day: '2-digit',
+      month: '2-digit'
+    })
+  }
+
   const createManualAppointment = async (event) => {
     event.preventDefault()
     setError('')
     setMessage('')
+    if (!manualAppointment.startTime) {
+      setError('Selecciona un horario disponible para el medico elegido.')
+      return
+    }
     try {
       await appointmentsService.create(manualAppointment)
       setMessage('Turno manual creado en HOLD')
@@ -249,7 +367,9 @@ export function ClinicDashboardPage () {
                   setManualAppointment((prev) => ({
                     ...prev,
                     doctorId: event.target.value,
-                    specialtyId: doctor?.specialtyId || ''
+                    specialtyId: doctor?.specialtyId || '',
+                    date: today,
+                    startTime: ''
                   }))
                 }}
               >
@@ -259,10 +379,64 @@ export function ClinicDashboardPage () {
                 ))}
               </select>
             </label>
+
+            {manualAppointment.doctorId && (
+              <div className='space-y-2 rounded-xl border border-emerald-200/70 bg-white/70 p-3'>
+                <p className='text-xs font-semibold uppercase tracking-wide text-emerald-900/70'>
+                  Proximos dias con agenda disponible
+                </p>
+                {manualAvailabilityLoading
+                  ? <p className='text-xs text-emerald-900/70'>Buscando disponibilidad...</p>
+                  : (
+                      <div className='flex flex-wrap gap-2'>
+                        {manualAvailableDates.length === 0
+                          ? <span className='text-xs text-emerald-900/70'>Este medico no tiene agenda cargada en los proximos 21 dias.</span>
+                          : manualAvailableDates.map((item) => (
+                              <button
+                                key={item.date}
+                                type='button'
+                                onClick={() => setManualAppointment((prev) => ({ ...prev, date: item.date, startTime: '' }))}
+                                className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                                  manualAppointment.date === item.date
+                                    ? 'border-brand-500 bg-brand-100 text-brand-800'
+                                    : 'border-emerald-200 bg-white/70 text-emerald-900/75 hover:bg-emerald-100'
+                                }`}
+                              >
+                                {formatDateLabel(item.date)} ({item.count})
+                              </button>
+                            ))}
+                      </div>
+                    )}
+              </div>
+            )}
+
             <div className='grid gap-2 sm:grid-cols-2'>
-              <Input label='Fecha' type='date' value={manualAppointment.date} onChange={(event) => setManualAppointment((prev) => ({ ...prev, date: event.target.value }))} />
-              <Input label='Hora' type='time' value={manualAppointment.startTime} onChange={(event) => setManualAppointment((prev) => ({ ...prev, startTime: event.target.value }))} />
+              <Input
+                label='Fecha'
+                type='date'
+                min={today}
+                value={manualAppointment.date}
+                onChange={(event) => setManualAppointment((prev) => ({ ...prev, date: event.target.value, startTime: '' }))}
+              />
+              <label className='block space-y-1'>
+                <span className='text-xs text-emerald-900/75'>Horario disponible</span>
+                <select
+                  className='glass-input'
+                  value={manualAppointment.startTime}
+                  onChange={(event) => setManualAppointment((prev) => ({ ...prev, startTime: event.target.value }))}
+                >
+                  <option value=''>
+                    {manualSlotsLoading ? 'Buscando horarios...' : 'Seleccionar'}
+                  </option>
+                  {manualDateSlots.map((slot) => (
+                    <option key={slot.startTime} value={slot.startTime}>{slot.startTime.slice(0, 5)}</option>
+                  ))}
+                </select>
+              </label>
             </div>
+            {!manualSlotsLoading && manualAppointment.doctorId && manualDateSlots.length === 0
+              ? <p className='text-xs text-amber-700'>No hay horarios disponibles para la fecha elegida.</p>
+              : null}
             <Input label='Paciente' value={manualAppointment.fullName} onChange={(event) => setManualAppointment((prev) => ({ ...prev, fullName: event.target.value }))} />
             <div className='grid gap-2 sm:grid-cols-2'>
               <Input label='DNI' value={manualAppointment.dni} onChange={(event) => setManualAppointment((prev) => ({ ...prev, dni: event.target.value }))} />
