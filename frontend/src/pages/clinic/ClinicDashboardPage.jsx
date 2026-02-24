@@ -28,6 +28,11 @@ export function ClinicDashboardPage () {
   const [manualDateSlots, setManualDateSlots] = useState([])
   const [manualAvailabilityLoading, setManualAvailabilityLoading] = useState(false)
   const [manualSlotsLoading, setManualSlotsLoading] = useState(false)
+  const [rescheduleDoctorId, setRescheduleDoctorId] = useState('')
+  const [rescheduleAvailableDates, setRescheduleAvailableDates] = useState([])
+  const [rescheduleDateSlots, setRescheduleDateSlots] = useState([])
+  const [rescheduleAvailabilityLoading, setRescheduleAvailabilityLoading] = useState(false)
+  const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
@@ -55,7 +60,7 @@ export function ClinicDashboardPage () {
   const [rescheduleDraft, setRescheduleDraft] = useState({
     appointmentId: '',
     date: today,
-    startTime: '09:00'
+    startTime: ''
   })
   const [blockDraft, setBlockDraft] = useState({
     doctorId: '',
@@ -165,7 +170,7 @@ export function ClinicDashboardPage () {
             ? prev
             : {
                 ...prev,
-                startTime: data.slots[0]?.startTime || ''
+                startTime: ''
               }
         })
       } catch (apiError) {
@@ -180,6 +185,96 @@ export function ClinicDashboardPage () {
       isCancelled = true
     }
   }, [manualAppointment.doctorId, manualAppointment.date])
+
+  useEffect(() => {
+    if (!rescheduleDoctorId) {
+      setRescheduleAvailableDates([])
+      setRescheduleDateSlots([])
+      return
+    }
+
+    let isCancelled = false
+    const loadRescheduleAvailability = async () => {
+      setRescheduleAvailabilityLoading(true)
+      setError('')
+      try {
+        const dates = buildUpcomingDates(21)
+        const results = await Promise.all(
+          dates.map(async (date) => {
+            const data = await slotsService.list({ doctorId: rescheduleDoctorId, date })
+            return { date, count: data.slots.length }
+          })
+        )
+
+        if (isCancelled) return
+
+        const withAvailability = results.filter((item) => item.count > 0)
+        setRescheduleAvailableDates(withAvailability)
+
+        if (withAvailability.length === 0) {
+          setRescheduleDateSlots([])
+          setRescheduleDraft((prev) => ({ ...prev, startTime: '' }))
+          return
+        }
+
+        setRescheduleDraft((prev) => {
+          const keepDate = withAvailability.some((item) => item.date === prev.date)
+          return {
+            ...prev,
+            date: keepDate ? prev.date : withAvailability[0].date,
+            startTime: ''
+          }
+        })
+      } catch (apiError) {
+        if (!isCancelled) setError(apiError.message)
+      } finally {
+        if (!isCancelled) setRescheduleAvailabilityLoading(false)
+      }
+    }
+
+    loadRescheduleAvailability().catch(() => {})
+    return () => {
+      isCancelled = true
+    }
+  }, [rescheduleDoctorId])
+
+  useEffect(() => {
+    if (!rescheduleDoctorId || !rescheduleDraft.date) {
+      setRescheduleDateSlots([])
+      return
+    }
+
+    let isCancelled = false
+    const loadRescheduleDateSlots = async () => {
+      setRescheduleSlotsLoading(true)
+      try {
+        const data = await slotsService.list({
+          doctorId: rescheduleDoctorId,
+          date: rescheduleDraft.date
+        })
+        if (isCancelled) return
+        setRescheduleDateSlots(data.slots)
+        setRescheduleDraft((prev) => {
+          const exists = data.slots.some((slot) => slot.startTime === prev.startTime)
+          return exists
+            ? prev
+            : {
+                ...prev,
+                startTime: ''
+              }
+        })
+      } catch (apiError) {
+        if (!isCancelled) setError(apiError.message)
+      } finally {
+        if (!isCancelled) setRescheduleSlotsLoading(false)
+      }
+    }
+
+    loadRescheduleDateSlots().catch(() => {})
+    return () => {
+      isCancelled = true
+    }
+  }, [rescheduleDoctorId, rescheduleDraft.date])
 
   const loadSlots = async () => {
     if (!doctorFilters.date || !appointmentFilters.doctorId) return
@@ -197,6 +292,14 @@ export function ClinicDashboardPage () {
   const selectedSpecialtyName = useMemo(() => {
     return specialties.find((item) => item.id === doctorFilters.specialtyId)?.name || 'Todas'
   }, [doctorFilters.specialtyId, specialties])
+
+  const rescheduleAppointments = useMemo(() => {
+    return appointments.filter((appointment) => {
+      const appointmentDoctorId = appointment.doctorId || appointment.doctor?.id
+      if (rescheduleDoctorId && appointmentDoctorId !== rescheduleDoctorId) return false
+      return !['cancelled', 'attended', 'no_show'].includes(appointment.status)
+    })
+  }, [appointments, rescheduleDoctorId])
 
   const formatDateLabel = (value) => {
     return new Date(`${value}T00:00:00`).toLocaleDateString('es-AR', {
@@ -235,6 +338,10 @@ export function ClinicDashboardPage () {
   const rescheduleAppointment = async (event) => {
     event.preventDefault()
     if (!rescheduleDraft.appointmentId) return
+    if (!rescheduleDraft.startTime) {
+      setError('Selecciona un horario disponible para reprogramar el turno.')
+      return
+    }
     try {
       await appointmentsService.reschedule(rescheduleDraft.appointmentId, {
         date: rescheduleDraft.date,
@@ -411,13 +518,12 @@ export function ClinicDashboardPage () {
             )}
 
             <div className='grid gap-2 sm:grid-cols-2'>
-              <Input
-                label='Fecha'
-                type='date'
-                min={today}
-                value={manualAppointment.date}
-                onChange={(event) => setManualAppointment((prev) => ({ ...prev, date: event.target.value, startTime: '' }))}
-              />
+              <label className='block space-y-1'>
+                <span className='text-xs text-emerald-900/75'>Dia seleccionado</span>
+                <div className='glass-input flex h-11 items-center'>
+                  {manualAppointment.date ? formatDateLabel(manualAppointment.date) : 'Seleccionar un dia'}
+                </div>
+              </label>
               <label className='block space-y-1'>
                 <span className='text-xs text-emerald-900/75'>Horario disponible</span>
                 <select
@@ -451,24 +557,109 @@ export function ClinicDashboardPage () {
           <h2 className='text-lg font-semibold text-emerald-950'>Reprogramar turno</h2>
           <form className='space-y-3' onSubmit={rescheduleAppointment}>
             <label className='block space-y-1'>
+              <span className='text-xs text-emerald-900/75'>Medico</span>
+              <select
+                className='glass-input'
+                value={rescheduleDoctorId}
+                onChange={(event) => {
+                  setRescheduleDoctorId(event.target.value)
+                  setRescheduleDraft((prev) => ({
+                    ...prev,
+                    appointmentId: '',
+                    date: today,
+                    startTime: ''
+                  }))
+                }}
+              >
+                <option value=''>Seleccionar</option>
+                {doctors.map((doctor) => (
+                  <option key={doctor.id} value={doctor.id}>{doctor.fullName}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className='block space-y-1'>
               <span className='text-xs text-emerald-900/75'>Turno</span>
               <select
                 className='glass-input'
                 value={rescheduleDraft.appointmentId}
-                onChange={(event) => setRescheduleDraft((prev) => ({ ...prev, appointmentId: event.target.value }))}
+                onChange={(event) => {
+                  const appointmentId = event.target.value
+                  const appointment = appointments.find((item) => item.id === appointmentId)
+                  setRescheduleDraft((prev) => ({
+                    ...prev,
+                    appointmentId,
+                    date: appointment?.date || prev.date,
+                    startTime: ''
+                  }))
+                }}
+                disabled={!rescheduleDoctorId}
               >
-                <option value=''>Seleccionar</option>
-                {appointments.map((appointment) => (
+                <option value=''>{rescheduleDoctorId ? 'Seleccionar' : 'Primero seleccionar medico'}</option>
+                {rescheduleAppointments.map((appointment) => (
                   <option key={appointment.id} value={appointment.id}>
                     {appointment.date} {appointment.startTime.slice(0, 5)} - {appointment.patient?.fullName}
                   </option>
                 ))}
               </select>
             </label>
+
+            {rescheduleDoctorId && (
+              <div className='space-y-2 rounded-xl border border-emerald-200/70 bg-white/70 p-3'>
+                <p className='text-xs font-semibold uppercase tracking-wide text-emerald-900/70'>
+                  Proximos dias con agenda disponible
+                </p>
+                {rescheduleAvailabilityLoading
+                  ? <p className='text-xs text-emerald-900/70'>Buscando disponibilidad...</p>
+                  : (
+                      <div className='flex flex-wrap gap-2'>
+                        {rescheduleAvailableDates.length === 0
+                          ? <span className='text-xs text-emerald-900/70'>Este medico no tiene agenda cargada en los proximos 21 dias.</span>
+                          : rescheduleAvailableDates.map((item) => (
+                              <button
+                                key={item.date}
+                                type='button'
+                                onClick={() => setRescheduleDraft((prev) => ({ ...prev, date: item.date, startTime: '' }))}
+                                className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                                  rescheduleDraft.date === item.date
+                                    ? 'border-brand-500 bg-brand-100 text-brand-800'
+                                    : 'border-emerald-200 bg-white/70 text-emerald-900/75 hover:bg-emerald-100'
+                                }`}
+                              >
+                                {formatDateLabel(item.date)} ({item.count})
+                              </button>
+                            ))}
+                      </div>
+                    )}
+              </div>
+            )}
+
             <div className='grid gap-2 sm:grid-cols-2'>
-              <Input label='Nueva fecha' type='date' value={rescheduleDraft.date} onChange={(event) => setRescheduleDraft((prev) => ({ ...prev, date: event.target.value }))} />
-              <Input label='Nueva hora' type='time' value={rescheduleDraft.startTime} onChange={(event) => setRescheduleDraft((prev) => ({ ...prev, startTime: event.target.value }))} />
+              <label className='block space-y-1'>
+                <span className='text-xs text-emerald-900/75'>Nuevo dia seleccionado</span>
+                <div className='glass-input flex h-11 items-center'>
+                  {rescheduleDraft.date ? formatDateLabel(rescheduleDraft.date) : 'Seleccionar un dia'}
+                </div>
+              </label>
+              <label className='block space-y-1'>
+                <span className='text-xs text-emerald-900/75'>Nuevo horario disponible</span>
+                <select
+                  className='glass-input'
+                  value={rescheduleDraft.startTime}
+                  onChange={(event) => setRescheduleDraft((prev) => ({ ...prev, startTime: event.target.value }))}
+                >
+                  <option value=''>
+                    {rescheduleSlotsLoading ? 'Buscando horarios...' : 'Seleccionar'}
+                  </option>
+                  {rescheduleDateSlots.map((slot) => (
+                    <option key={slot.startTime} value={slot.startTime}>{slot.startTime.slice(0, 5)}</option>
+                  ))}
+                </select>
+              </label>
             </div>
+            {!rescheduleSlotsLoading && rescheduleDoctorId && rescheduleDateSlots.length === 0
+              ? <p className='text-xs text-amber-700'>No hay horarios disponibles para la fecha elegida.</p>
+              : null}
             <Button type='submit'>Reprogramar</Button>
           </form>
         </Card>
