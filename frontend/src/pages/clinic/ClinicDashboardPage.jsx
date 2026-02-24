@@ -18,6 +18,23 @@ const buildUpcomingDates = (days) => {
   })
 }
 
+const parseTimeToMinutes = (value) => {
+  const [hours, minutes] = String(value || '').split(':').map(Number)
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return NaN
+  return (hours * 60) + minutes
+}
+
+const formatMinutesToTime = (totalMinutes) => {
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+}
+
+const normalizeTimeValue = (value) => {
+  const [hours = '00', minutes = '00'] = String(value || '').split(':')
+  return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`
+}
+
 export function ClinicDashboardPage () {
   const today = useMemo(() => toLocalIsoDate(), [])
   const [specialties, setSpecialties] = useState([])
@@ -33,6 +50,9 @@ export function ClinicDashboardPage () {
   const [rescheduleDateSlots, setRescheduleDateSlots] = useState([])
   const [rescheduleAvailabilityLoading, setRescheduleAvailabilityLoading] = useState(false)
   const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false)
+  const [blockWeeklyAvailability, setBlockWeeklyAvailability] = useState([])
+  const [blockAvailableDates, setBlockAvailableDates] = useState([])
+  const [blockAvailabilityLoading, setBlockAvailabilityLoading] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
@@ -65,8 +85,8 @@ export function ClinicDashboardPage () {
   const [blockDraft, setBlockDraft] = useState({
     doctorId: '',
     date: today,
-    startTime: '12:00',
-    endTime: '13:00',
+    startTime: '',
+    endTime: '',
     reason: 'Bloqueo administrativo'
   })
 
@@ -276,6 +296,69 @@ export function ClinicDashboardPage () {
     }
   }, [rescheduleDoctorId, rescheduleDraft.date])
 
+  useEffect(() => {
+    if (!blockDraft.doctorId) {
+      setBlockWeeklyAvailability([])
+      setBlockAvailableDates([])
+      return
+    }
+
+    let isCancelled = false
+    const loadBlockAvailability = async () => {
+      setBlockAvailabilityLoading(true)
+      setError('')
+      try {
+        const data = await doctorsService.getAvailability(blockDraft.doctorId)
+        if (isCancelled) return
+
+        const weeklyAvailability = (data.availability || [])
+          .filter((item) => item.isActive !== false)
+          .map((item) => ({
+            dayOfWeek: Number(item.dayOfWeek),
+            startTime: normalizeTimeValue(item.startTime),
+            endTime: normalizeTimeValue(item.endTime),
+            slotMinutes: Number(item.slotMinutes) || 30
+          }))
+
+        const dates = buildUpcomingDates(21)
+        const withAvailability = dates
+          .map((date) => {
+            const dayOfWeek = new Date(`${date}T00:00:00`).getDay()
+            const ranges = weeklyAvailability.filter((item) => item.dayOfWeek === dayOfWeek)
+            return { date, count: ranges.length }
+          })
+          .filter((item) => item.count > 0)
+
+        setBlockWeeklyAvailability(weeklyAvailability)
+        setBlockAvailableDates(withAvailability)
+
+        if (withAvailability.length === 0) {
+          setBlockDraft((prev) => ({ ...prev, startTime: '', endTime: '' }))
+          return
+        }
+
+        setBlockDraft((prev) => {
+          const keepDate = withAvailability.some((item) => item.date === prev.date)
+          return {
+            ...prev,
+            date: keepDate ? prev.date : withAvailability[0].date,
+            startTime: '',
+            endTime: ''
+          }
+        })
+      } catch (apiError) {
+        if (!isCancelled) setError(apiError.message)
+      } finally {
+        if (!isCancelled) setBlockAvailabilityLoading(false)
+      }
+    }
+
+    loadBlockAvailability().catch(() => {})
+    return () => {
+      isCancelled = true
+    }
+  }, [blockDraft.doctorId])
+
   const loadSlots = async () => {
     if (!doctorFilters.date || !appointmentFilters.doctorId) return
     try {
@@ -301,6 +384,77 @@ export function ClinicDashboardPage () {
     })
   }, [appointments, rescheduleDoctorId])
 
+  const manualDaysWithAvailability = useMemo(
+    () => manualAvailableDates.filter((item) => Number(item.count) > 0),
+    [manualAvailableDates]
+  )
+
+  const rescheduleDaysWithAvailability = useMemo(
+    () => rescheduleAvailableDates.filter((item) => Number(item.count) > 0),
+    [rescheduleAvailableDates]
+  )
+
+  const manualOpenSlots = useMemo(() => {
+    const uniqueByStart = new Map(
+      manualDateSlots
+        .filter((slot) => Boolean(slot?.startTime))
+        .map((slot) => [slot.startTime, slot])
+    )
+    return Array.from(uniqueByStart.values()).sort((a, b) => a.startTime.localeCompare(b.startTime))
+  }, [manualDateSlots])
+
+  const rescheduleOpenSlots = useMemo(() => {
+    const uniqueByStart = new Map(
+      rescheduleDateSlots
+        .filter((slot) => Boolean(slot?.startTime))
+        .map((slot) => [slot.startTime, slot])
+    )
+    return Array.from(uniqueByStart.values()).sort((a, b) => a.startTime.localeCompare(b.startTime))
+  }, [rescheduleDateSlots])
+
+  const blockDayRanges = useMemo(() => {
+    if (!blockDraft.date) return []
+    const dayOfWeek = new Date(`${blockDraft.date}T00:00:00`).getDay()
+    return blockWeeklyAvailability
+      .filter((item) => item.dayOfWeek === dayOfWeek)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime))
+  }, [blockDraft.date, blockWeeklyAvailability])
+
+  const blockStartOptions = useMemo(() => {
+    const startValues = new Set()
+    blockDayRanges.forEach((range) => {
+      const start = parseTimeToMinutes(range.startTime)
+      const end = parseTimeToMinutes(range.endTime)
+      const step = Number(range.slotMinutes) || 30
+      for (let cursor = start; cursor + step <= end; cursor += step) {
+        startValues.add(formatMinutesToTime(cursor))
+      }
+    })
+    return Array.from(startValues).sort((a, b) => a.localeCompare(b))
+  }, [blockDayRanges])
+
+  const blockEndOptions = useMemo(() => {
+    if (!blockDraft.startTime) return []
+    const startMinutes = parseTimeToMinutes(blockDraft.startTime)
+    if (Number.isNaN(startMinutes)) return []
+
+    const endValues = new Set()
+    blockDayRanges.forEach((range) => {
+      const rangeStart = parseTimeToMinutes(range.startTime)
+      const rangeEnd = parseTimeToMinutes(range.endTime)
+      const step = Number(range.slotMinutes) || 30
+
+      if (startMinutes < rangeStart || startMinutes >= rangeEnd) {
+        return
+      }
+
+      for (let cursor = startMinutes + step; cursor <= rangeEnd; cursor += step) {
+        endValues.add(formatMinutesToTime(cursor))
+      }
+    })
+    return Array.from(endValues).sort((a, b) => a.localeCompare(b))
+  }, [blockDayRanges, blockDraft.startTime])
+
   const formatDateLabel = (value) => {
     return new Date(`${value}T00:00:00`).toLocaleDateString('es-AR', {
       weekday: 'short',
@@ -313,7 +467,8 @@ export function ClinicDashboardPage () {
     event.preventDefault()
     setError('')
     setMessage('')
-    if (!manualAppointment.startTime) {
+    const isManualTimeAvailable = manualOpenSlots.some((slot) => slot.startTime === manualAppointment.startTime)
+    if (!manualAppointment.startTime || !isManualTimeAvailable) {
       setError('Selecciona un horario disponible para el medico elegido.')
       return
     }
@@ -338,7 +493,8 @@ export function ClinicDashboardPage () {
   const rescheduleAppointment = async (event) => {
     event.preventDefault()
     if (!rescheduleDraft.appointmentId) return
-    if (!rescheduleDraft.startTime) {
+    const isRescheduleTimeAvailable = rescheduleOpenSlots.some((slot) => slot.startTime === rescheduleDraft.startTime)
+    if (!rescheduleDraft.startTime || !isRescheduleTimeAvailable) {
       setError('Selecciona un horario disponible para reprogramar el turno.')
       return
     }
@@ -357,6 +513,16 @@ export function ClinicDashboardPage () {
   const createBlock = async (event) => {
     event.preventDefault()
     if (!blockDraft.doctorId) return
+    if (!blockDraft.startTime || !blockDraft.endTime) {
+      setError('Selecciona un dia y un rango horario valido para bloquear.')
+      return
+    }
+    const validStart = blockStartOptions.includes(blockDraft.startTime)
+    const validEnd = blockEndOptions.includes(blockDraft.endTime)
+    if (!validStart || !validEnd) {
+      setError('El rango de bloqueo debe estar dentro del horario de atencion del medico.')
+      return
+    }
     try {
       await doctorsService.createBlock(blockDraft.doctorId, {
         date: blockDraft.date,
@@ -365,6 +531,7 @@ export function ClinicDashboardPage () {
         reason: blockDraft.reason
       })
       setMessage('Bloqueo guardado')
+      setBlockDraft((prev) => ({ ...prev, startTime: '', endTime: '' }))
     } catch (apiError) {
       setError(apiError.message)
     }
@@ -441,7 +608,13 @@ export function ClinicDashboardPage () {
               <select
                 className='glass-input'
                 value={blockDraft.doctorId}
-                onChange={(event) => setBlockDraft((prev) => ({ ...prev, doctorId: event.target.value }))}
+                onChange={(event) => setBlockDraft((prev) => ({
+                  ...prev,
+                  doctorId: event.target.value,
+                  date: today,
+                  startTime: '',
+                  endTime: ''
+                }))}
               >
                 <option value=''>Seleccionar</option>
                 {doctors.map((doctor) => (
@@ -449,13 +622,87 @@ export function ClinicDashboardPage () {
                 ))}
               </select>
             </label>
-            <Input label='Fecha' type='date' value={blockDraft.date} onChange={(event) => setBlockDraft((prev) => ({ ...prev, date: event.target.value }))} />
+
+            {blockDraft.doctorId && (
+              <div className='space-y-2 rounded-xl border border-emerald-200/70 bg-white/70 p-3'>
+                <p className='text-xs font-semibold uppercase tracking-wide text-emerald-900/70'>
+                  Proximos dias con agenda disponible
+                </p>
+                {blockAvailabilityLoading
+                  ? <p className='text-xs text-emerald-900/70'>Buscando disponibilidad...</p>
+                  : (
+                      <div className='flex flex-wrap gap-2'>
+                        {blockAvailableDates.length === 0
+                          ? <span className='text-xs text-emerald-900/70'>Este medico no tiene agenda cargada en los proximos 21 dias.</span>
+                          : blockAvailableDates.map((item) => (
+                              <button
+                                key={item.date}
+                                type='button'
+                                onClick={() => setBlockDraft((prev) => ({ ...prev, date: item.date, startTime: '', endTime: '' }))}
+                                className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                                  blockDraft.date === item.date
+                                    ? 'border-brand-500 bg-brand-100 text-brand-800'
+                                    : 'border-emerald-200 bg-white/70 text-emerald-900/75 hover:bg-emerald-100'
+                                }`}
+                              >
+                                {formatDateLabel(item.date)}
+                              </button>
+                            ))}
+                      </div>
+                    )}
+              </div>
+            )}
+
+            <label className='block space-y-1'>
+              <span className='text-xs text-emerald-900/75'>Dia seleccionado</span>
+              <div className='glass-input flex h-11 items-center'>
+                {blockDraft.date ? formatDateLabel(blockDraft.date) : 'Seleccionar un dia'}
+              </div>
+            </label>
+
             <div className='grid gap-2 sm:grid-cols-2'>
-              <Input label='Inicio' type='time' value={blockDraft.startTime} onChange={(event) => setBlockDraft((prev) => ({ ...prev, startTime: event.target.value }))} />
-              <Input label='Fin' type='time' value={blockDraft.endTime} onChange={(event) => setBlockDraft((prev) => ({ ...prev, endTime: event.target.value }))} />
+              <label className='block space-y-1'>
+                <span className='text-xs text-emerald-900/75'>Inicio del bloqueo</span>
+                <select
+                  className='glass-input'
+                  value={blockDraft.startTime}
+                  onChange={(event) => setBlockDraft((prev) => ({ ...prev, startTime: event.target.value, endTime: '' }))}
+                  disabled={!blockDraft.doctorId || blockStartOptions.length === 0}
+                >
+                  <option value=''>Seleccionar</option>
+                  {blockStartOptions.map((time) => (
+                    <option key={time} value={time}>{time}</option>
+                  ))}
+                </select>
+              </label>
+              <label className='block space-y-1'>
+                <span className='text-xs text-emerald-900/75'>Fin del bloqueo</span>
+                <select
+                  className='glass-input'
+                  value={blockDraft.endTime}
+                  onChange={(event) => setBlockDraft((prev) => ({ ...prev, endTime: event.target.value }))}
+                  disabled={!blockDraft.startTime || blockEndOptions.length === 0}
+                >
+                  <option value=''>Seleccionar</option>
+                  {blockEndOptions.map((time) => (
+                    <option key={time} value={time}>{time}</option>
+                  ))}
+                </select>
+              </label>
             </div>
+            {!blockAvailabilityLoading && blockDraft.doctorId && blockAvailableDates.length === 0
+              ? <p className='text-xs text-amber-700'>No hay dias disponibles para bloquear en los proximos 21 dias.</p>
+              : null}
+            {!blockAvailabilityLoading && blockDraft.doctorId && blockAvailableDates.length > 0 && blockStartOptions.length === 0
+              ? <p className='text-xs text-amber-700'>No hay horarios configurados para el dia seleccionado.</p>
+              : null}
             <Input label='Motivo' value={blockDraft.reason} onChange={(event) => setBlockDraft((prev) => ({ ...prev, reason: event.target.value }))} />
-            <Button type='submit'>Guardar bloqueo</Button>
+            <Button
+              type='submit'
+              disabled={!blockDraft.doctorId || !blockDraft.startTime || !blockDraft.endTime}
+            >
+              Guardar bloqueo
+            </Button>
           </form>
         </Card>
       </div>
@@ -496,9 +743,9 @@ export function ClinicDashboardPage () {
                   ? <p className='text-xs text-emerald-900/70'>Buscando disponibilidad...</p>
                   : (
                       <div className='flex flex-wrap gap-2'>
-                        {manualAvailableDates.length === 0
+                        {manualDaysWithAvailability.length === 0
                           ? <span className='text-xs text-emerald-900/70'>Este medico no tiene agenda cargada en los proximos 21 dias.</span>
-                          : manualAvailableDates.map((item) => (
+                          : manualDaysWithAvailability.map((item) => (
                               <button
                                 key={item.date}
                                 type='button'
@@ -534,13 +781,13 @@ export function ClinicDashboardPage () {
                   <option value=''>
                     {manualSlotsLoading ? 'Buscando horarios...' : 'Seleccionar'}
                   </option>
-                  {manualDateSlots.map((slot) => (
+                  {manualOpenSlots.map((slot) => (
                     <option key={slot.startTime} value={slot.startTime}>{slot.startTime.slice(0, 5)}</option>
                   ))}
                 </select>
               </label>
             </div>
-            {!manualSlotsLoading && manualAppointment.doctorId && manualDateSlots.length === 0
+            {!manualSlotsLoading && manualAppointment.doctorId && manualOpenSlots.length === 0
               ? <p className='text-xs text-amber-700'>No hay horarios disponibles para la fecha elegida.</p>
               : null}
             <Input label='Paciente' value={manualAppointment.fullName} onChange={(event) => setManualAppointment((prev) => ({ ...prev, fullName: event.target.value }))} />
@@ -549,7 +796,9 @@ export function ClinicDashboardPage () {
               <Input label='Telefono' value={manualAppointment.phone} onChange={(event) => setManualAppointment((prev) => ({ ...prev, phone: event.target.value }))} />
             </div>
             <Input label='Sintomas / motivo' value={manualAppointment.symptoms} onChange={(event) => setManualAppointment((prev) => ({ ...prev, symptoms: event.target.value }))} />
-            <Button type='submit'>Crear turno</Button>
+            <Button type='submit' disabled={!manualAppointment.doctorId || !manualAppointment.startTime || manualOpenSlots.length === 0}>
+              Crear turno
+            </Button>
           </form>
         </Card>
 
@@ -613,9 +862,9 @@ export function ClinicDashboardPage () {
                   ? <p className='text-xs text-emerald-900/70'>Buscando disponibilidad...</p>
                   : (
                       <div className='flex flex-wrap gap-2'>
-                        {rescheduleAvailableDates.length === 0
+                        {rescheduleDaysWithAvailability.length === 0
                           ? <span className='text-xs text-emerald-900/70'>Este medico no tiene agenda cargada en los proximos 21 dias.</span>
-                          : rescheduleAvailableDates.map((item) => (
+                          : rescheduleDaysWithAvailability.map((item) => (
                               <button
                                 key={item.date}
                                 type='button'
@@ -651,16 +900,21 @@ export function ClinicDashboardPage () {
                   <option value=''>
                     {rescheduleSlotsLoading ? 'Buscando horarios...' : 'Seleccionar'}
                   </option>
-                  {rescheduleDateSlots.map((slot) => (
+                  {rescheduleOpenSlots.map((slot) => (
                     <option key={slot.startTime} value={slot.startTime}>{slot.startTime.slice(0, 5)}</option>
                   ))}
                 </select>
               </label>
             </div>
-            {!rescheduleSlotsLoading && rescheduleDoctorId && rescheduleDateSlots.length === 0
+            {!rescheduleSlotsLoading && rescheduleDoctorId && rescheduleOpenSlots.length === 0
               ? <p className='text-xs text-amber-700'>No hay horarios disponibles para la fecha elegida.</p>
               : null}
-            <Button type='submit'>Reprogramar</Button>
+            <Button
+              type='submit'
+              disabled={!rescheduleDraft.appointmentId || !rescheduleDraft.startTime || rescheduleOpenSlots.length === 0}
+            >
+              Reprogramar
+            </Button>
           </form>
         </Card>
       </div>

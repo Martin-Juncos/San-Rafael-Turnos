@@ -13,6 +13,7 @@ import { AppError } from '../utils/errors.js'
 import { ok, paginated } from '../utils/response.js'
 import { parsePagination, buildPagination } from '../utils/pagination.js'
 import { writeAuditLog } from '../utils/audit.js'
+import { parseTimeToMinutes } from '../utils/time.js'
 
 const availabilityItemSchema = z.object({
   dayOfWeek: z.coerce.number().int().min(0).max(6),
@@ -121,6 +122,18 @@ const ensureDoctorReadPermission = (auth, doctorId) => {
 
 const normalizeDni = (value) => String(value).replace(/\D/g, '')
 const maskDni = (dni) => `***${String(dni).slice(-4)}`
+const normalizeTimeValue = (value) => {
+  if (!value) return ''
+  const [hours = '00', minutes = '00'] = String(value).split(':')
+  return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`
+}
+const rangeContains = (outerStart, outerEnd, innerStart, innerEnd) => {
+  const o1 = parseTimeToMinutes(outerStart)
+  const o2 = parseTimeToMinutes(outerEnd)
+  const i1 = parseTimeToMinutes(innerStart)
+  const i2 = parseTimeToMinutes(innerEnd)
+  return i1 >= o1 && i2 <= o2
+}
 
 export const listDoctors = async (req, res) => {
   const { query = {} } = req.validated
@@ -344,9 +357,47 @@ export const putDoctorAvailability = async (req, res) => {
 
 export const createDoctorBlock = async (req, res) => {
   const doctorId = req.validated.params.id
+  const doctor = await Doctor.findByPk(doctorId)
+  if (!doctor) {
+    throw new AppError('Medico no encontrado', 404, 'doctor_not_found')
+  }
+
+  const normalizedStartTime = normalizeTimeValue(req.validated.body.startTime)
+  const normalizedEndTime = normalizeTimeValue(req.validated.body.endTime)
+  if (parseTimeToMinutes(normalizedEndTime) <= parseTimeToMinutes(normalizedStartTime)) {
+    throw new AppError('La hora de fin debe ser mayor a la hora de inicio', 400, 'invalid_time_range')
+  }
+
+  const dayOfWeek = new Date(`${req.validated.body.date}T00:00:00`).getDay()
+  const availability = await DoctorAvailability.findAll({
+    where: {
+      doctorId,
+      dayOfWeek,
+      isActive: true
+    }
+  })
+
+  if (availability.length === 0) {
+    throw new AppError('No se puede bloquear: el medico no atiende ese dia', 400, 'block_outside_schedule')
+  }
+
+  const insideSchedule = availability.some((item) =>
+    rangeContains(
+      normalizeTimeValue(item.startTime),
+      normalizeTimeValue(item.endTime),
+      normalizedStartTime,
+      normalizedEndTime
+    )
+  )
+  if (!insideSchedule) {
+    throw new AppError('Solo puedes bloquear horarios dentro de la agenda del medico', 400, 'block_outside_schedule')
+  }
+
   const block = await DoctorBlock.create({
     doctorId,
     ...req.validated.body,
+    startTime: normalizedStartTime,
+    endTime: normalizedEndTime,
     createdByRole: req.auth.role,
     createdByUserId: req.auth.sub
   })

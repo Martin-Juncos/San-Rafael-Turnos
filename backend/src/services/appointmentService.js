@@ -13,6 +13,12 @@ import { AppError } from '../utils/errors.js'
 
 const ACTIVE_SLOT_STATUSES = ['hold', 'confirmed']
 
+const normalizeTimeValue = (value) => {
+  if (!value) return ''
+  const [hours = '00', minutes = '00'] = String(value).split(':')
+  return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`
+}
+
 const rangesOverlap = (aStart, aEnd, bStart, bEnd) => {
   const a1 = parseTimeToMinutes(aStart)
   const a2 = parseTimeToMinutes(aEnd)
@@ -55,6 +61,8 @@ export const ensureDoctorAvailableAtSlot = async ({
   endTime,
   transaction
 }) => {
+  const normalizedStartTime = normalizeTimeValue(startTime)
+  const normalizedEndTime = normalizeTimeValue(endTime)
   const dayOfWeek = new Date(`${date}T00:00:00`).getDay()
   const availability = await DoctorAvailability.findAll({
     where: {
@@ -66,7 +74,7 @@ export const ensureDoctorAvailableAtSlot = async ({
   })
 
   const inAvailability = availability.some((item) =>
-    rangeContains(item.startTime, item.endTime, startTime, endTime)
+    rangeContains(item.startTime, item.endTime, normalizedStartTime, normalizedEndTime)
   )
 
   if (!inAvailability) {
@@ -82,7 +90,7 @@ export const ensureDoctorAvailableAtSlot = async ({
   })
 
   const isBlocked = blocks.some((block) =>
-    rangesOverlap(startTime, endTime, block.startTime, block.endTime)
+    rangesOverlap(normalizedStartTime, normalizedEndTime, block.startTime, block.endTime)
   )
   if (isBlocked) {
     throw new AppError('Horario bloqueado por administracion', 409, 'slot_blocked')
@@ -96,10 +104,11 @@ export const ensureNoSlotConflict = async ({
   excludeAppointmentId,
   transaction
 }) => {
+  const normalizedStartTime = normalizeTimeValue(startTime)
   const where = {
     doctorId,
     date,
-    startTime,
+    startTime: normalizedStartTime,
     status: {
       [Op.in]: ACTIVE_SLOT_STATUSES
     }
@@ -145,10 +154,10 @@ export const getAvailableSlots = async ({ doctorId, date }) => {
   })
 
   const blockedRanges = blocks.map((item) => ({
-    startTime: item.startTime,
-    endTime: item.endTime
+    startTime: normalizeTimeValue(item.startTime),
+    endTime: normalizeTimeValue(item.endTime)
   }))
-  const takenStarts = new Set(booked.map((item) => item.startTime))
+  const takenStarts = new Set(booked.map((item) => normalizeTimeValue(item.startTime)))
 
   const slots = availability.flatMap((range) => buildSlotsForRange(range.startTime, range.endTime, range.slotMinutes))
 
