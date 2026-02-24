@@ -33,13 +33,13 @@ export function ReservePage () {
 
   useEffect(() => {
     const load = async () => {
-      const [specResult, doctorsResult] = await Promise.all([
+      const [specResult, insuranceResult, doctorsResult] = await Promise.all([
         specialtiesService.list({ pageSize: 100 }),
-        insurancesService.list({ pageSize: 100 }),
+        insurancesService.list({ pageSize: 100, isActive: 'true' }),
         doctorsService.list({ pageSize: 100 })
       ])
       setSpecialties(specResult.items)
-      setInsurances(docsResultFixMe)
+      setInsurances(insuranceResult.items)
       setDoctors(doctorsResult.items)
     }
     load().catch((apiError) => setError(apiError.message))
@@ -72,7 +72,11 @@ export function ReservePage () {
       return
     }
     try {
-      const data = await appointmentsService.create(form)
+      const payload = {
+        ...form,
+        insuranceId: form.insuranceId || undefined
+      }
+      const data = await appointmentsService.create(payload)
       setHoldResult(data)
       setSuccess('Turno en HOLD creado. Confirma pago para reservar definitivamente.')
     } catch (apiError) {
@@ -133,6 +137,22 @@ export function ReservePage () {
                 <option value=''>Seleccionar</option>
                 {filteredDoctors.map((doctor) => (
                   <option key={doctor.id} value={doctor.id}>{doctor.fullName}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className='space-y-1 text-sm sm:col-span-2'>
+              <span className='text-xs text-emerald-900/75'>Obra social (opcional)</span>
+              <select
+                className='glass-input'
+                value={form.insuranceId}
+                onChange={(event) => setForm((prev) => ({ ...prev, insuranceId: event.target.value }))}
+              >
+                <option value=''>Particular (sin descuento)</option>
+                {insurances.map((insurance) => (
+                  <option key={insurance.id} value={insurance.id}>
+                    {insurance.name} - {insurance.discountPercent}% desc.
+                  </option>
                 ))}
               </select>
             </label>
@@ -215,6 +235,15 @@ export function ReservePage () {
                 <p>Estado: {holdResult.appointment.status}</p>
                 <p>Pago: {holdResult.payment.status}</p>
                 <p>Monto: ${holdResult.payment.amount}</p>
+                {holdResult.pricing
+                  ? (
+                    <>
+                      <p>Arancel base: ${holdResult.pricing.baseAmount}</p>
+                      <p>Descuento aplicado: {holdResult.pricing.discountPercent}%</p>
+                      <p>Monto final: ${holdResult.pricing.finalAmount}</p>
+                    </>
+                    )
+                  : null}
               </div>
               )
             : <p className='text-sm text-emerald-900/70'>Aun no hay un turno en HOLD.</p>}
