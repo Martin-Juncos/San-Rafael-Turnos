@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { Card } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
@@ -24,6 +24,12 @@ const paymentStatusLabels = {
   refunded: 'Reintegrado'
 }
 
+const MOCK_PAYMENT_CREDENTIALS = {
+  cardNumber: '4509953566233704',
+  expiry: '11/30',
+  cvv: '123'
+}
+
 const toLocalIsoDate = (date = new Date()) => {
   const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000))
   return local.toISOString().slice(0, 10)
@@ -40,6 +46,7 @@ const buildUpcomingDates = (days) => {
 
 export function ReservePage () {
   const auth = useAppSelector(selectAuth)
+  const location = useLocation()
   const [specialties, setSpecialties] = useState([])
   const [insurances, setInsurances] = useState([])
   const [doctors, setDoctors] = useState([])
@@ -50,6 +57,17 @@ export function ReservePage () {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [holdResult, setHoldResult] = useState(null)
+  const [showCheckout, setShowCheckout] = useState(false)
+  const [paymentLoading, setPaymentLoading] = useState(false)
+  const [mercadoPagoLoading, setMercadoPagoLoading] = useState(false)
+  const [paymentError, setPaymentError] = useState('')
+  const [paymentForm, setPaymentForm] = useState({
+    cardNumber: '',
+    cardHolder: '',
+    expiry: '',
+    cvv: ''
+  })
+  const summaryRef = useRef(null)
 
   const today = useMemo(() => toLocalIsoDate(), [])
   const [form, setForm] = useState({
@@ -164,6 +182,75 @@ export function ReservePage () {
     fetchSlotsByDate(form.doctorId, form.date, true).catch(() => {})
   }, [form.doctorId, form.date, fetchSlotsByDate])
 
+  useEffect(() => {
+    if (auth.role !== 'patient') return
+
+    const params = new URLSearchParams(location.search)
+    const appointmentId = params.get('appointmentId')
+    const mpStatus = params.get('mp_status')
+    const paymentId = params.get('payment_id') || params.get('collection_id')
+
+    if (!appointmentId && !mpStatus && !paymentId) return
+
+    let isCancelled = false
+    const clearQuery = () => {
+      if (typeof window !== 'undefined') {
+        window.history.replaceState({}, '', '/reservar')
+      }
+    }
+
+    const syncReturn = async () => {
+      setError('')
+      setPaymentError('')
+
+      try {
+        if (paymentId) {
+          await paymentsService.syncMercadoPago(paymentId)
+        }
+
+        if (!appointmentId) {
+          clearQuery()
+          return
+        }
+
+        const [appointment, payment] = await Promise.all([
+          appointmentsService.getById(appointmentId),
+          paymentsService.getByAppointment(appointmentId)
+        ])
+
+        if (isCancelled) return
+        setHoldResult((prev) => ({
+          appointment,
+          payment,
+          paymentIntent: prev?.paymentIntent ?? null,
+          pricing: prev?.pricing ?? null
+        }))
+        setShowCheckout(false)
+
+        if (payment.status === 'paid' || mpStatus === 'success') {
+          setSuccess('Pago aprobado por Mercado Pago. Tu turno quedo confirmado.')
+        } else if (mpStatus === 'failure') {
+          setError('El pago en Mercado Pago fue rechazado o cancelado.')
+        } else if (mpStatus === 'pending') {
+          setSuccess('Pago pendiente de acreditacion. Te avisaremos cuando se confirme.')
+        }
+
+        clearQuery()
+        summaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      } catch (apiError) {
+        if (!isCancelled) {
+          setError(apiError.message || 'No se pudo sincronizar el pago de Mercado Pago.')
+          clearQuery()
+        }
+      }
+    }
+
+    syncReturn().catch(() => {})
+    return () => {
+      isCancelled = true
+    }
+  }, [auth.role, location.search])
+
   const createHold = async () => {
     setError('')
     setSuccess('')
@@ -178,20 +265,108 @@ export function ReservePage () {
       }
       const data = await appointmentsService.create(payload)
       setHoldResult(data)
+      setShowCheckout(true)
+      setPaymentError('')
       setSuccess('Reserva creada. Completa el pago para confirmar tu turno.')
     } catch (apiError) {
       setError(apiError.message)
     }
   }
 
+  const openCheckout = () => {
+    if (!holdResult?.appointment?.id) {
+      setError('Primero debes reservar el turno para habilitar el pago.')
+      return
+    }
+    setPaymentError('')
+    setShowCheckout(true)
+  }
+
+  const startMercadoPagoCheckout = async () => {
+    if (!holdResult?.appointment?.id) {
+      setError('Primero debes reservar el turno para habilitar el pago.')
+      return
+    }
+
+    setError('')
+    setPaymentError('')
+    setMercadoPagoLoading(true)
+    try {
+      const preference = await paymentsService.createMercadoPagoPreference(holdResult.appointment.id)
+      const checkoutUrl = preference.sandboxInitPoint || preference.initPoint
+      if (!checkoutUrl) {
+        throw new Error('No se recibio URL de checkout')
+      }
+      window.location.assign(checkoutUrl)
+    } catch (apiError) {
+      setError(apiError.message || 'No se pudo iniciar Mercado Pago.')
+    } finally {
+      setMercadoPagoLoading(false)
+    }
+  }
+
+  const formatCardNumber = (value) => {
+    const digits = value.replace(/\D/g, '').slice(0, 16)
+    return digits.replace(/(\d{4})(?=\d)/g, '$1 ').trim()
+  }
+
+  const formatExpiry = (value) => {
+    const digits = value.replace(/\D/g, '').slice(0, 4)
+    if (digits.length <= 2) return digits
+    return `${digits.slice(0, 2)}/${digits.slice(2)}`
+  }
+
   const confirmPayment = async () => {
     if (!holdResult?.appointment?.id) return
     setError('')
+    setSuccess('')
+    setPaymentError('')
+
+    const normalizedCard = paymentForm.cardNumber.replace(/\D/g, '')
+    const normalizedCvv = paymentForm.cvv.replace(/\D/g, '')
+    const normalizedExpiry = paymentForm.expiry
+
+    if (!paymentForm.cardHolder.trim() || normalizedCard.length !== 16 || !/^\d{2}\/\d{2}$/.test(normalizedExpiry) || normalizedCvv.length !== 3) {
+      setPaymentError('Completa los datos de tarjeta de prueba para continuar.')
+      return
+    }
+
+    if (
+      normalizedCard !== MOCK_PAYMENT_CREDENTIALS.cardNumber ||
+      normalizedExpiry !== MOCK_PAYMENT_CREDENTIALS.expiry ||
+      normalizedCvv !== MOCK_PAYMENT_CREDENTIALS.cvv
+    ) {
+      setPaymentError('Credenciales de prueba invalidas. Usa los datos sugeridos en pantalla.')
+      return
+    }
+
+    setPaymentLoading(true)
     try {
-      await paymentsService.confirmMock(holdResult.appointment.id)
-      setSuccess('Pago confirmado. Tu turno quedo confirmado.')
+      const payment = await paymentsService.confirmMock(holdResult.appointment.id)
+      setHoldResult((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          appointment: {
+            ...prev.appointment,
+            status: 'confirmed'
+          },
+          payment
+        }
+      })
+      setShowCheckout(false)
+      setPaymentForm({
+        cardNumber: '',
+        cardHolder: '',
+        expiry: '',
+        cvv: ''
+      })
+      setSuccess('Pago aprobado. Tu turno quedo confirmado.')
+      summaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     } catch (apiError) {
-      setError(apiError.message)
+      setPaymentError(apiError.message)
+    } finally {
+      setPaymentLoading(false)
     }
   }
 
@@ -365,11 +540,65 @@ export function ReservePage () {
             />
           </div>
 
-          <Button onClick={createHold} disabled={!form.startTime}>Reservar turno (pendiente de pago)</Button>
-          {holdResult?.appointment?.id ? (
-            <Button variant='secondary' onClick={confirmPayment}>
-              Confirmar pago y confirmar turno
+          <div className='grid gap-2 sm:grid-cols-3'>
+            <Button onClick={createHold} disabled={!form.startTime}>Reservar turno (pendiente de pago)</Button>
+            <Button variant='secondary' onClick={openCheckout} disabled={!holdResult?.appointment?.id}>
+              Pagar (demo)
             </Button>
+            <Button
+              variant='secondary'
+              onClick={startMercadoPagoCheckout}
+              disabled={!holdResult?.appointment?.id || mercadoPagoLoading}
+            >
+              {mercadoPagoLoading ? 'Redirigiendo...' : 'Mercado Pago (sandbox)'}
+            </Button>
+          </div>
+
+          {showCheckout && holdResult?.appointment?.id ? (
+            <div className='space-y-3 rounded-xl border border-brand-200 bg-brand-50/70 p-3'>
+              <p className='text-sm font-semibold text-brand-900'>Pago de prueba (desarrollo)</p>
+              <p className='text-xs text-brand-900/80'>
+                Usa estas credenciales ficticias para aprobar:
+                {' '}Tarjeta <strong>4509 9535 6623 3704</strong>,
+                {' '}Vencimiento <strong>11/30</strong>,
+                {' '}CVV <strong>123</strong>.
+              </p>
+              <div className='grid gap-3 sm:grid-cols-2'>
+                <Input
+                  label='Numero de tarjeta'
+                  value={paymentForm.cardNumber}
+                  onChange={(event) => setPaymentForm((prev) => ({ ...prev, cardNumber: formatCardNumber(event.target.value) }))}
+                  placeholder='4509 9535 6623 3704'
+                />
+                <Input
+                  label='Titular'
+                  value={paymentForm.cardHolder}
+                  onChange={(event) => setPaymentForm((prev) => ({ ...prev, cardHolder: event.target.value }))}
+                  placeholder='Paciente Demo'
+                />
+                <Input
+                  label='Vencimiento (MM/AA)'
+                  value={paymentForm.expiry}
+                  onChange={(event) => setPaymentForm((prev) => ({ ...prev, expiry: formatExpiry(event.target.value) }))}
+                  placeholder='11/30'
+                />
+                <Input
+                  label='CVV'
+                  value={paymentForm.cvv}
+                  onChange={(event) => setPaymentForm((prev) => ({ ...prev, cvv: event.target.value.replace(/\D/g, '').slice(0, 3) }))}
+                  placeholder='123'
+                />
+              </div>
+              <div className='flex flex-wrap gap-2'>
+                <Button onClick={confirmPayment} disabled={paymentLoading}>
+                  {paymentLoading ? 'Procesando pago...' : 'Pagar ahora'}
+                </Button>
+                <Button variant='secondary' onClick={() => setShowCheckout(false)} disabled={paymentLoading}>
+                  Cancelar
+                </Button>
+              </div>
+              {paymentError ? <p className='text-sm text-red-600'>{paymentError}</p> : null}
+            </div>
           ) : null}
 
           {!auth.token && (
@@ -379,30 +608,32 @@ export function ReservePage () {
           )}
         </Card>
 
-        <Card className='space-y-2'>
-          <h2 className='text-lg font-semibold text-emerald-950'>Resumen de reserva</h2>
-          {holdResult
-            ? (
-              <div className='space-y-1 text-sm text-emerald-900/80'>
-                <p>Reserva: {holdResult.appointment.id}</p>
-                <p>Estado del turno: {appointmentStatusLabels[holdResult.appointment.status] || holdResult.appointment.status}</p>
-                <p>Estado del pago: {paymentStatusLabels[holdResult.payment.status] || holdResult.payment.status}</p>
-                <p>Monto a pagar: ${holdResult.payment.amount}</p>
-                {holdResult.pricing
-                  ? (
-                    <>
-                      <p>Arancel base: ${holdResult.pricing.baseAmount}</p>
-                      <p>Descuento aplicado: {holdResult.pricing.discountPercent}%</p>
-                      <p>Monto final: ${holdResult.pricing.finalAmount}</p>
-                    </>
-                    )
-                  : null}
-              </div>
-              )
-            : <p className='text-sm text-emerald-900/70'>Aun no creaste una reserva.</p>}
-          {success ? <p className='text-sm text-emerald-700'>{success}</p> : null}
-          {error ? <p className='text-sm text-red-600'>{error}</p> : null}
-        </Card>
+        <div ref={summaryRef}>
+          <Card className='space-y-2'>
+            <h2 className='text-lg font-semibold text-emerald-950'>Resumen de reserva</h2>
+            {holdResult
+              ? (
+                <div className='space-y-1 text-sm text-emerald-900/80'>
+                  <p>Reserva: {holdResult.appointment.id}</p>
+                  <p>Estado del turno: {appointmentStatusLabels[holdResult.appointment.status] || holdResult.appointment.status}</p>
+                  <p>Estado del pago: {paymentStatusLabels[holdResult.payment.status] || holdResult.payment.status}</p>
+                  <p>Monto a pagar: ${holdResult.payment.amount}</p>
+                  {holdResult.pricing
+                    ? (
+                      <>
+                        <p>Arancel base: ${holdResult.pricing.baseAmount}</p>
+                        <p>Descuento aplicado: {holdResult.pricing.discountPercent}%</p>
+                        <p>Monto final: ${holdResult.pricing.finalAmount}</p>
+                      </>
+                      )
+                    : null}
+                </div>
+                )
+              : <p className='text-sm text-emerald-900/70'>Aun no creaste una reserva.</p>}
+            {success ? <p className='text-sm text-emerald-700'>{success}</p> : null}
+            {error ? <p className='text-sm text-red-600'>{error}</p> : null}
+          </Card>
+        </div>
       </div>
     </div>
   )
