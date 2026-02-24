@@ -45,6 +45,7 @@ export const createDoctorSchema = z.object({
     fullName: z.string().min(3).max(120),
     email: z.string().email(),
     phone: z.string().min(8).max(20),
+    consultorio: z.coerce.number().int().positive(),
     specialtyId: z.string().uuid(),
     bio: z.string().max(2000).optional(),
     isActive: z.boolean().optional()
@@ -58,6 +59,7 @@ export const updateDoctorSchema = z.object({
     fullName: z.string().min(3).max(120).optional(),
     email: z.string().email().optional(),
     phone: z.string().min(8).max(20).optional(),
+    consultorio: z.coerce.number().int().positive().optional(),
     specialtyId: z.string().uuid().optional(),
     bio: z.string().max(2000).optional().nullable(),
     isActive: z.boolean().optional()

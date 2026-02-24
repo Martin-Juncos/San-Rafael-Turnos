@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import { Card } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
-import { doctorsService, specialtiesService } from '../../api/services'
+import { doctorsService, insurancesService, specialtiesService } from '../../api/services'
 
 const dayLabels = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab']
 
 export function AdminDashboardPage () {
   const [specialties, setSpecialties] = useState([])
+  const [insurances, setInsurances] = useState([])
   const [doctors, setDoctors] = useState([])
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -17,10 +18,15 @@ export function AdminDashboardPage () {
     description: '',
     fee: 15000
   })
+  const [insuranceForm, setInsuranceForm] = useState({
+    name: '',
+    discountPercent: 0
+  })
   const [doctorForm, setDoctorForm] = useState({
     fullName: '',
     email: '',
     phone: '',
+    consultorio: '',
     specialtyId: ''
   })
 
@@ -34,11 +40,13 @@ export function AdminDashboardPage () {
   })
 
   const load = async () => {
-    const [specialtyResult, doctorsResult] = await Promise.all([
+    const [specialtyResult, insurancesResult, doctorsResult] = await Promise.all([
       specialtiesService.list({ pageSize: 100, isActive: 'true' }),
+      insurancesService.list({ pageSize: 100, isActive: 'true' }),
       doctorsService.list({ pageSize: 100 })
     ])
     setSpecialties(specialtyResult.items)
+    setInsurances(insurancesResult.items)
     setDoctors(doctorsResult.items)
   }
 
@@ -68,10 +76,30 @@ export function AdminDashboardPage () {
     setError('')
     setMessage('')
     try {
-      await doctorsService.create(doctorForm)
-      setDoctorForm({ fullName: '', email: '', phone: '', specialtyId: '' })
+      await doctorsService.create({
+        ...doctorForm,
+        consultorio: Number(doctorForm.consultorio)
+      })
+      setDoctorForm({ fullName: '', email: '', phone: '', consultorio: '', specialtyId: '' })
       await load()
       setMessage('Medico creado')
+    } catch (apiError) {
+      setError(apiError.message)
+    }
+  }
+
+  const handleCreateInsurance = async (event) => {
+    event.preventDefault()
+    setError('')
+    setMessage('')
+    try {
+      await insurancesService.create({
+        name: insuranceForm.name,
+        discountPercent: Number(insuranceForm.discountPercent)
+      })
+      setInsuranceForm({ name: '', discountPercent: 0 })
+      await load()
+      setMessage('Obra social creada')
     } catch (apiError) {
       setError(apiError.message)
     }
@@ -91,6 +119,16 @@ export function AdminDashboardPage () {
     setError('')
     try {
       await doctorsService.remove(id)
+      await load()
+    } catch (apiError) {
+      setError(apiError.message)
+    }
+  }
+
+  const handleDeleteInsurance = async (id) => {
+    setError('')
+    try {
+      await insurancesService.remove(id)
       await load()
     } catch (apiError) {
       setError(apiError.message)
@@ -208,6 +246,13 @@ export function AdminDashboardPage () {
               value={doctorForm.phone}
               onChange={(event) => setDoctorForm((prev) => ({ ...prev, phone: event.target.value }))}
             />
+            <Input
+              label='Consultorio'
+              type='number'
+              min='1'
+              value={doctorForm.consultorio}
+              onChange={(event) => setDoctorForm((prev) => ({ ...prev, consultorio: event.target.value }))}
+            />
             <label className='space-y-1'>
               <span className='text-xs text-emerald-900/75'>Especialidad</span>
               <select
@@ -230,6 +275,7 @@ export function AdminDashboardPage () {
                 <div>
                   <p className='font-semibold text-emerald-950'>{doctor.fullName}</p>
                   <p className='text-xs text-emerald-900/70'>{doctor.email}</p>
+                  <p className='text-xs text-emerald-900/70'>Consultorio: {doctor.consultorio}</p>
                 </div>
                 <Button variant='danger' className='px-3 py-1.5 text-xs' onClick={() => handleDeleteDoctor(doctor.id)}>
                   Eliminar
@@ -239,6 +285,42 @@ export function AdminDashboardPage () {
           </div>
         </Card>
       </div>
+
+      <Card className='space-y-4'>
+        <h2 className='text-lg font-semibold text-emerald-950'>Obras sociales</h2>
+        <form className='grid gap-2 sm:grid-cols-3' onSubmit={handleCreateInsurance}>
+          <Input
+            label='Nombre'
+            value={insuranceForm.name}
+            onChange={(event) => setInsuranceForm((prev) => ({ ...prev, name: event.target.value }))}
+          />
+          <Input
+            label='Descuento (%)'
+            type='number'
+            min='0'
+            max='100'
+            step='0.01'
+            value={insuranceForm.discountPercent}
+            onChange={(event) => setInsuranceForm((prev) => ({ ...prev, discountPercent: event.target.value }))}
+          />
+          <Button type='submit' className='self-end'>Crear obra social</Button>
+        </form>
+
+        <div className='space-y-2'>
+          {insurances.map((insurance) => (
+            <div key={insurance.id} className='flex items-center justify-between rounded-xl bg-white/70 p-3 text-sm'>
+              <div>
+                <p className='font-semibold text-emerald-950'>{insurance.name}</p>
+                <p className='text-xs text-emerald-900/70'>Descuento: {insurance.discountPercent}%</p>
+              </div>
+              <Button variant='danger' className='px-3 py-1.5 text-xs' onClick={() => handleDeleteInsurance(insurance.id)}>
+                Eliminar
+              </Button>
+            </div>
+          ))}
+          {insurances.length === 0 ? <p className='text-sm text-emerald-900/75'>No hay obras sociales cargadas.</p> : null}
+        </div>
+      </Card>
 
       <Card className='space-y-4'>
         <h2 className='text-lg font-semibold text-emerald-950'>Disponibilidad por medico</h2>

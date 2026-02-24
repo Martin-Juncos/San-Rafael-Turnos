@@ -3,13 +3,14 @@ import { Link } from 'react-router-dom'
 import { Card } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
-import { appointmentsService, doctorsService, paymentsService, slotsService, specialtiesService } from '../../api/services'
+import { appointmentsService, doctorsService, insurancesService, paymentsService, slotsService, specialtiesService } from '../../api/services'
 import { useAppSelector } from '../../app/hooks'
 import { selectAuth } from '../../features/auth/authSlice'
 
 export function ReservePage () {
   const auth = useAppSelector(selectAuth)
   const [specialties, setSpecialties] = useState([])
+  const [insurances, setInsurances] = useState([])
   const [doctors, setDoctors] = useState([])
   const [slots, setSlots] = useState([])
   const [loadingSlots, setLoadingSlots] = useState(false)
@@ -21,6 +22,7 @@ export function ReservePage () {
   const [form, setForm] = useState({
     specialtyId: '',
     doctorId: '',
+    insuranceId: '',
     date: today,
     startTime: '',
     fullName: auth.patient?.fullName || '',
@@ -33,9 +35,11 @@ export function ReservePage () {
     const load = async () => {
       const [specResult, doctorsResult] = await Promise.all([
         specialtiesService.list({ pageSize: 100 }),
+        insurancesService.list({ pageSize: 100 }),
         doctorsService.list({ pageSize: 100 })
       ])
       setSpecialties(specResult.items)
+      setInsurances(docsResultFixMe)
       setDoctors(doctorsResult.items)
     }
     load().catch((apiError) => setError(apiError.message))

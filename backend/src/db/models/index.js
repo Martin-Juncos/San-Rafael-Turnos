@@ -2,6 +2,7 @@ import { sequelize } from '../../config/database.js'
 import { initUserModel, User } from './User.js'
 import { initRefreshTokenModel, RefreshToken } from './RefreshToken.js'
 import { initSpecialtyModel, Specialty } from './Specialty.js'
+import { initHealthInsuranceModel, HealthInsurance } from './HealthInsurance.js'
 import { initDoctorModel, Doctor } from './Doctor.js'
 import { initDoctorAvailabilityModel, DoctorAvailability } from './DoctorAvailability.js'
 import { initDoctorBlockModel, DoctorBlock } from './DoctorBlock.js'
@@ -22,6 +23,7 @@ export const initModels = () => {
   initUserModel(sequelize)
   initRefreshTokenModel(sequelize)
   initSpecialtyModel(sequelize)
+  initHealthInsuranceModel(sequelize)
   initDoctorModel(sequelize)
   initDoctorAvailabilityModel(sequelize)
   initDoctorBlockModel(sequelize)
@@ -46,6 +48,9 @@ export const initModels = () => {
 
   Specialty.hasMany(Appointment, { foreignKey: 'specialtyId', as: 'appointments' })
   Appointment.belongsTo(Specialty, { foreignKey: 'specialtyId', as: 'specialty' })
+
+  HealthInsurance.hasMany(Appointment, { foreignKey: 'insuranceId', as: 'appointments' })
+  Appointment.belongsTo(HealthInsurance, { foreignKey: 'insuranceId', as: 'insurance' })
 
   Patient.hasMany(Appointment, { foreignKey: 'patientId', as: 'appointments' })
   Appointment.belongsTo(Patient, { foreignKey: 'patientId', as: 'patient' })
@@ -72,6 +77,7 @@ export {
   User,
   RefreshToken,
   Specialty,
+  HealthInsurance,
   Doctor,
   DoctorAvailability,
   DoctorBlock,

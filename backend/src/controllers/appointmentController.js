@@ -5,6 +5,7 @@ import {
   Doctor,
   Patient,
   Specialty,
+  HealthInsurance,
   Payment,
   sequelize
 } from '../db/models/index.js'
@@ -25,6 +26,7 @@ const createAppointmentBodySchema = z.object({
   specialtyId: z.string().uuid(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   startTime: z.string().regex(/^\d{2}:\d{2}$/),
+  insuranceId: z.string().uuid().optional(),
   symptoms: z.string().max(4000).optional(),
   fullName: z.string().min(3).max(120),
   dni: z.string().min(6).max(12),
@@ -111,6 +113,7 @@ export const rescheduleAppointmentSchema = z.object({
 const includeDefault = [
   { model: Doctor, as: 'doctor' },
   { model: Specialty, as: 'specialty' },
+  { model: HealthInsurance, as: 'insurance' },
   { model: Patient, as: 'patient' },
   { model: Payment, as: 'payment' }
 ]
@@ -156,6 +159,7 @@ export const createAppointment = async (req, res) => {
   let appointment
   let payment
   let paymentIntent
+  let pricing = null
 
   try {
     await sequelize.transaction(async (transaction) => {
@@ -186,15 +190,40 @@ export const createAppointment = async (req, res) => {
         throw new AppError('Especialidad no encontrada', 404, 'specialty_not_found')
       }
 
+      let insurance = null
+      if (payload.insuranceId) {
+        insurance = await HealthInsurance.findOne({
+          where: {
+            id: payload.insuranceId,
+            isActive: true
+          },
+          transaction
+        })
+        if (!insurance) {
+          throw new AppError('Obra social no encontrada o inactiva', 404, 'insurance_not_found')
+        }
+      }
+
+      const baseAmount = Number(specialty.fee)
+      const discountPercent = insurance ? Number(insurance.discountPercent) : 0
+      const discountedAmount = Math.max(0, Number((baseAmount - ((baseAmount * discountPercent) / 100)).toFixed(2)))
+      pricing = {
+        baseAmount,
+        discountPercent,
+        finalAmount: discountedAmount
+      }
+
       appointment = await Appointment.create(
         {
           doctorId: payload.doctorId,
           specialtyId: payload.specialtyId,
+          insuranceId: insurance?.id ?? null,
           patientId: patient.id,
           date: payload.date,
           startTime: payload.startTime,
           endTime,
           symptoms: payload.symptoms ?? null,
+          discountPercentApplied: discountPercent,
           status: 'hold',
           createdByRole: actorRole,
           createdByUserId: actorId
@@ -206,7 +235,7 @@ export const createAppointment = async (req, res) => {
         {
           appointmentId: appointment.id,
           provider: 'mock',
-          amount: specialty.fee,
+          amount: discountedAmount,
           currency: 'ARS',
           status: 'pending'
         },
@@ -215,7 +244,7 @@ export const createAppointment = async (req, res) => {
 
       paymentIntent = createMockPaymentIntent({
         appointmentId: appointment.id,
-        amount: Number(specialty.fee)
+        amount: discountedAmount
       })
 
       await writeAuditLog({
@@ -227,7 +256,9 @@ export const createAppointment = async (req, res) => {
         meta: {
           doctorId: payload.doctorId,
           date: payload.date,
-          startTime: payload.startTime
+          startTime: payload.startTime,
+          insuranceId: insurance?.id ?? null,
+          discountPercent
         },
         transaction
       })
@@ -244,7 +275,8 @@ export const createAppointment = async (req, res) => {
     {
       appointment,
       payment,
-      paymentIntent
+      paymentIntent,
+      pricing
     },
     'appointment_created_hold',
     201

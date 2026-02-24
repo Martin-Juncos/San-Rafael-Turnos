@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs'
 import { sequelize } from '../config/database.js'
 import {
   Specialty,
+  HealthInsurance,
   Doctor,
   DoctorAvailability,
   User
@@ -46,12 +47,22 @@ const run = async () => {
       }
     })
 
+    await HealthInsurance.findOrCreate({
+      where: { name: 'OSEP' },
+      defaults: {
+        name: 'OSEP',
+        discountPercent: 20,
+        isActive: true
+      }
+    })
+
     const [doctor] = await Doctor.findOrCreate({
       where: { email: 'medico@mail.com' },
       defaults: {
         fullName: 'Dr. Juan Perez',
         email: 'medico@mail.com',
         phone: '+5492604000000',
+        consultorio: 101,
         specialtyId: clinicaGeneral.id,
         bio: 'Medico clinico',
         isActive: true

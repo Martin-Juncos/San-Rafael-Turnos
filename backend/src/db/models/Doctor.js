@@ -24,6 +24,14 @@ export const initDoctorModel = (sequelize) => {
         type: DataTypes.STRING,
         allowNull: false
       },
+      consultorio: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 1,
+        validate: {
+          min: 1
+        }
+      },
       specialtyId: {
         type: DataTypes.UUID,
         allowNull: false

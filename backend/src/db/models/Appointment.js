@@ -18,6 +18,10 @@ export const initAppointmentModel = (sequelize) => {
         type: DataTypes.UUID,
         allowNull: false
       },
+      insuranceId: {
+        type: DataTypes.UUID,
+        allowNull: true
+      },
       patientId: {
         type: DataTypes.UUID,
         allowNull: false
@@ -58,6 +62,11 @@ export const initAppointmentModel = (sequelize) => {
       cancelReason: {
         type: DataTypes.STRING,
         allowNull: true
+      },
+      discountPercentApplied: {
+        type: DataTypes.DECIMAL(5, 2),
+        allowNull: false,
+        defaultValue: 0
       },
       createdByRole: {
         type: DataTypes.ENUM('admin', 'clinic', 'doctor', 'patient'),
