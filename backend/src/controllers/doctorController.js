@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs'
 import { Op } from 'sequelize'
 import { z } from 'zod'
 import {
@@ -5,6 +6,7 @@ import {
   Specialty,
   DoctorAvailability,
   DoctorBlock,
+  User,
   sequelize
 } from '../db/models/index.js'
 import { AppError } from '../utils/errors.js'
@@ -45,6 +47,7 @@ export const createDoctorSchema = z.object({
     fullName: z.string().min(3).max(120),
     email: z.string().email(),
     phone: z.string().min(8).max(20),
+    dni: z.string().regex(/^\d{6,12}$/),
     consultorio: z.coerce.number().int().positive(),
     specialtyId: z.string().uuid(),
     bio: z.string().max(2000).optional(),
@@ -59,6 +62,7 @@ export const updateDoctorSchema = z.object({
     fullName: z.string().min(3).max(120).optional(),
     email: z.string().email().optional(),
     phone: z.string().min(8).max(20).optional(),
+    dni: z.string().regex(/^\d{6,12}$/).optional(),
     consultorio: z.coerce.number().int().positive().optional(),
     specialtyId: z.string().uuid().optional(),
     bio: z.string().max(2000).optional().nullable(),
@@ -115,6 +119,9 @@ const ensureDoctorReadPermission = (auth, doctorId) => {
   throw new AppError('Prohibido', 403, 'forbidden')
 }
 
+const normalizeDni = (value) => String(value).replace(/\D/g, '')
+const maskDni = (dni) => `***${String(dni).slice(-4)}`
+
 export const listDoctors = async (req, res) => {
   const { query = {} } = req.validated
   const { page, pageSize, offset, limit } = parsePagination(query)
@@ -167,35 +174,105 @@ export const getDoctorById = async (req, res) => {
 }
 
 export const createDoctor = async (req, res) => {
-  const doctor = await Doctor.create(req.validated.body)
+  const payload = {
+    ...req.validated.body,
+    dni: normalizeDni(req.validated.body.dni)
+  }
 
-  await writeAuditLog({
-    actorRole: req.auth.role,
-    actorId: req.auth.sub,
-    action: 'DOCTOR_CREATED',
-    entity: 'Doctor',
-    entityId: doctor.id,
-    meta: req.validated.body
-  })
+  let doctor
+  try {
+    await sequelize.transaction(async (transaction) => {
+      doctor = await Doctor.create(payload, { transaction })
+
+      const passwordHash = await bcrypt.hash(payload.dni, 10)
+      await User.create(
+        {
+          role: 'doctor',
+          email: payload.email,
+          passwordHash,
+          doctorId: doctor.id,
+          isActive: payload.isActive ?? true
+        },
+        { transaction }
+      )
+
+      await writeAuditLog({
+        actorRole: req.auth.role,
+        actorId: req.auth.sub,
+        action: 'DOCTOR_CREATED',
+        entity: 'Doctor',
+        entityId: doctor.id,
+        meta: {
+          ...payload,
+          dni: maskDni(payload.dni)
+        },
+        transaction
+      })
+    })
+  } catch (error) {
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      throw new AppError('Ya existe un medico o usuario con ese email/DNI', 409, 'doctor_conflict')
+    }
+    throw error
+  }
 
   ok(res, doctor, 'doctor_created', 201)
 }
 
 export const updateDoctor = async (req, res) => {
-  const doctor = await Doctor.findByPk(req.validated.params.id)
-  if (!doctor) {
-    throw new AppError('Medico no encontrado', 404, 'doctor_not_found')
+  const patch = { ...req.validated.body }
+  if (patch.dni) {
+    patch.dni = normalizeDni(patch.dni)
   }
-  await doctor.update(req.validated.body)
 
-  await writeAuditLog({
-    actorRole: req.auth.role,
-    actorId: req.auth.sub,
-    action: 'DOCTOR_UPDATED',
-    entity: 'Doctor',
-    entityId: doctor.id,
-    meta: req.validated.body
-  })
+  let doctor
+  try {
+    await sequelize.transaction(async (transaction) => {
+      doctor = await Doctor.findByPk(req.validated.params.id, { transaction })
+      if (!doctor) {
+        throw new AppError('Medico no encontrado', 404, 'doctor_not_found')
+      }
+      await doctor.update(patch, { transaction })
+
+      const doctorUser = await User.findOne({
+        where: {
+          doctorId: doctor.id,
+          role: 'doctor'
+        },
+        transaction
+      })
+
+      if (doctorUser) {
+        const userPatch = {}
+        if (patch.email) userPatch.email = patch.email
+        if (typeof patch.isActive === 'boolean') userPatch.isActive = patch.isActive
+        if (patch.dni) {
+          userPatch.passwordHash = await bcrypt.hash(patch.dni, 10)
+        }
+        if (Object.keys(userPatch).length > 0) {
+          await doctorUser.update(userPatch, { transaction })
+        }
+      }
+
+      await writeAuditLog({
+        actorRole: req.auth.role,
+        actorId: req.auth.sub,
+        action: 'DOCTOR_UPDATED',
+        entity: 'Doctor',
+        entityId: doctor.id,
+        meta: {
+          ...patch,
+          ...(patch.dni ? { dni: maskDni(patch.dni) } : {})
+        },
+        transaction
+      })
+    })
+  } catch (error) {
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      throw new AppError('Ya existe un medico o usuario con ese email/DNI', 409, 'doctor_conflict')
+    }
+    throw error
+  }
 
   ok(res, doctor, 'doctor_updated')
 }

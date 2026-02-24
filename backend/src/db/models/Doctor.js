@@ -24,6 +24,15 @@ export const initDoctorModel = (sequelize) => {
         type: DataTypes.STRING,
         allowNull: false
       },
+      dni: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        unique: true,
+        validate: {
+          len: [6, 12],
+          is: /^\d+$/
+        }
+      },
       consultorio: {
         type: DataTypes.INTEGER,
         allowNull: false,

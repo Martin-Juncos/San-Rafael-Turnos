@@ -25,49 +25,68 @@ const upsertUser = async ({ role, email, password, doctorId = null }) => {
   return user
 }
 
+const upsertParanoid = async (Model, where, values) => {
+  const existing = await Model.findOne({ where, paranoid: false })
+  if (existing) {
+    if (existing.deletedAt) {
+      await existing.restore()
+    }
+    await existing.update(values)
+    return existing
+  }
+  return Model.create(values)
+}
+
 const run = async () => {
   try {
     await sequelize.authenticate()
     await sequelize.sync({ alter: true })
 
-    const [clinicaGeneral] = await Specialty.findOrCreate({
-      where: { name: 'Clinica General' },
-      defaults: {
+    const clinicaGeneral = await upsertParanoid(
+      Specialty,
+      { name: 'Clinica General' },
+      {
+        name: 'Clinica General',
         description: 'Atencion clinica integral',
         fee: 15000,
         isActive: true
       }
-    })
-    await Specialty.findOrCreate({
-      where: { name: 'Cardiologia' },
-      defaults: {
+    )
+    await upsertParanoid(
+      Specialty,
+      { name: 'Cardiologia' },
+      {
+        name: 'Cardiologia',
         description: 'Atencion cardiovascular',
         fee: 22000,
         isActive: true
       }
-    })
+    )
 
-    await HealthInsurance.findOrCreate({
-      where: { name: 'OSEP' },
-      defaults: {
+    await upsertParanoid(
+      HealthInsurance,
+      { name: 'OSEP' },
+      {
         name: 'OSEP',
         discountPercent: 20,
         isActive: true
       }
-    })
+    )
 
-    const [doctor] = await Doctor.findOrCreate({
-      where: { email: 'medico@mail.com' },
-      defaults: {
+    const doctor = await upsertParanoid(
+      Doctor,
+      { email: 'medico@mail.com' },
+      {
         fullName: 'Dr. Juan Perez',
         email: 'medico@mail.com',
         phone: '+5492604000000',
+        dni: '30111222',
         consultorio: 101,
         specialtyId: clinicaGeneral.id,
         bio: 'Medico clinico',
         isActive: true
       }
-    })
+    )
 
     const countAvailability = await DoctorAvailability.count({
       where: {
@@ -84,7 +103,7 @@ const run = async () => {
 
     await upsertUser({ role: 'admin', email: 'admin@mail.com', password: 'admin' })
     await upsertUser({ role: 'clinic', email: 'clinica@mail.com', password: 'clinica' })
-    await upsertUser({ role: 'doctor', email: 'medico@mail.com', password: 'medico', doctorId: doctor.id })
+    await upsertUser({ role: 'doctor', email: 'medico@mail.com', password: doctor.dni, doctorId: doctor.id })
 
     logger.info('Seed completado')
     process.exit(0)

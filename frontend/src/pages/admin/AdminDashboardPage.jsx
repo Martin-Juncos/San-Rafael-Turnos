@@ -26,6 +26,7 @@ export function AdminDashboardPage () {
     fullName: '',
     email: '',
     phone: '',
+    dni: '',
     consultorio: '',
     specialtyId: ''
   })
@@ -80,9 +81,9 @@ export function AdminDashboardPage () {
         ...doctorForm,
         consultorio: Number(doctorForm.consultorio)
       })
-      setDoctorForm({ fullName: '', email: '', phone: '', consultorio: '', specialtyId: '' })
+      setDoctorForm({ fullName: '', email: '', phone: '', dni: '', consultorio: '', specialtyId: '' })
       await load()
-      setMessage('Medico creado')
+      setMessage('Medico creado. Credenciales iniciales: email + DNI.')
     } catch (apiError) {
       setError(apiError.message)
     }
@@ -247,6 +248,11 @@ export function AdminDashboardPage () {
               onChange={(event) => setDoctorForm((prev) => ({ ...prev, phone: event.target.value }))}
             />
             <Input
+              label='DNI (clave inicial)'
+              value={doctorForm.dni}
+              onChange={(event) => setDoctorForm((prev) => ({ ...prev, dni: event.target.value.replace(/\D/g, '') }))}
+            />
+            <Input
               label='Consultorio'
               type='number'
               min='1'
@@ -275,6 +281,7 @@ export function AdminDashboardPage () {
                 <div>
                   <p className='font-semibold text-emerald-950'>{doctor.fullName}</p>
                   <p className='text-xs text-emerald-900/70'>{doctor.email}</p>
+                  <p className='text-xs text-emerald-900/70'>DNI: {doctor.dni || '-'}</p>
                   <p className='text-xs text-emerald-900/70'>Consultorio: {doctor.consultorio}</p>
                 </div>
                 <Button variant='danger' className='px-3 py-1.5 text-xs' onClick={() => handleDeleteDoctor(doctor.id)}>

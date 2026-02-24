@@ -24,11 +24,9 @@ export function LoginPage () {
   const navigate = useNavigate()
   const [tab, setTab] = useState('staff')
   const [error, setLocalError] = useState('')
-  const [otpSent, setOtpSent] = useState(null)
 
   const [staffForm, setStaffForm] = useState({ email: 'admin@mail.com', password: 'admin' })
-  const [patientRequest, setPatientRequest] = useState({ dni: '', phone: '' })
-  const [patientVerify, setPatientVerify] = useState({ dni: '', code: '' })
+  const [patientForm, setPatientForm] = useState({ fullName: '', dni: '', phone: '' })
 
   const submitStaff = async (event) => {
     event.preventDefault()
@@ -45,27 +43,15 @@ export function LoginPage () {
     }
   }
 
-  const submitPatientRequest = async (event) => {
+  const submitPatient = async (event) => {
     event.preventDefault()
     setLocalError('')
     try {
-      const data = await patientAuthService.requestOtp(patientRequest)
-      setOtpSent(data)
-      setPatientVerify((prev) => ({ ...prev, dni: patientRequest.dni }))
-    } catch (apiError) {
-      setLocalError(apiError.message || 'No se pudo enviar OTP')
-    }
-  }
-
-  const submitPatientVerify = async (event) => {
-    event.preventDefault()
-    setLocalError('')
-    try {
-      const data = await patientAuthService.verifyOtp(patientVerify)
+      const data = await patientAuthService.login(patientForm)
       dispatch(setPatientSession(data))
-      navigate('/dashboard/paciente')
+      navigate('/reservar')
     } catch (apiError) {
-      setLocalError(apiError.message || 'OTP invalido')
+      setLocalError(apiError.message || 'No se pudo ingresar como paciente')
     }
   }
 
@@ -89,7 +75,7 @@ export function LoginPage () {
             onClick={() => setTab('patient')}
             className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${tab === 'patient' ? 'bg-brand-600 text-white' : 'text-emerald-900/80'}`}
           >
-            Paciente (OTP)
+            Paciente
           </button>
         </div>
 
@@ -112,34 +98,24 @@ export function LoginPage () {
         )}
 
         {tab === 'patient' && (
-          <div className='space-y-4'>
-            <form className='space-y-3' onSubmit={submitPatientRequest}>
-              <Input
-                label='DNI'
-                value={patientRequest.dni}
-                onChange={(event) => setPatientRequest((prev) => ({ ...prev, dni: event.target.value }))}
-              />
-              <Input
-                label='Telefono'
-                value={patientRequest.phone}
-                onChange={(event) => setPatientRequest((prev) => ({ ...prev, phone: event.target.value }))}
-              />
-              <Button type='submit' className='w-full'>Enviar codigo</Button>
-            </form>
-            <form className='space-y-3' onSubmit={submitPatientVerify}>
-              <Input
-                label='DNI'
-                value={patientVerify.dni}
-                onChange={(event) => setPatientVerify((prev) => ({ ...prev, dni: event.target.value }))}
-              />
-              <Input
-                label='Codigo OTP'
-                value={patientVerify.code}
-                onChange={(event) => setPatientVerify((prev) => ({ ...prev, code: event.target.value }))}
-              />
-              <Button type='submit' className='w-full'>Verificar e ingresar</Button>
-            </form>
-          </div>
+          <form className='space-y-3' onSubmit={submitPatient}>
+            <Input
+              label='Nombre completo'
+              value={patientForm.fullName}
+              onChange={(event) => setPatientForm((prev) => ({ ...prev, fullName: event.target.value }))}
+            />
+            <Input
+              label='DNI'
+              value={patientForm.dni}
+              onChange={(event) => setPatientForm((prev) => ({ ...prev, dni: event.target.value.replace(/\D/g, '') }))}
+            />
+            <Input
+              label='Telefono'
+              value={patientForm.phone}
+              onChange={(event) => setPatientForm((prev) => ({ ...prev, phone: event.target.value }))}
+            />
+            <Button type='submit' className='w-full'>Ingresar como paciente</Button>
+          </form>
         )}
 
         {error ? <p className='text-sm text-red-600'>{error}</p> : null}
@@ -150,16 +126,11 @@ export function LoginPage () {
         <ul className='space-y-2 text-sm text-emerald-900/80'>
           <li>Admin: admin@mail.com / admin</li>
           <li>Clinica: clinica@mail.com / clinica</li>
-          <li>Medico: medico@mail.com / medico</li>
+          <li>Medico: medico@mail.com / 30111222 (DNI)</li>
         </ul>
-        {otpSent
-          ? (
-            <div className='rounded-xl border border-emerald-200 bg-white/70 p-3 text-xs text-emerald-900/80'>
-              OTP enviado a {otpSent.phone}. Vence: {new Date(otpSent.expiresAt).toLocaleTimeString('es-AR')}.
-              {otpSent.debugCode ? ` Codigo debug: ${otpSent.debugCode}` : ''}
-            </div>
-            )
-          : null}
+        <p className='text-xs text-emerald-900/80'>
+          Pacientes: ingreso directo con nombre, DNI y telefono (sin OTP).
+        </p>
       </Card>
     </div>
   )

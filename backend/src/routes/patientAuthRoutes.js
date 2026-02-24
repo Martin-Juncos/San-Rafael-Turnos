@@ -3,15 +3,12 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import { validate } from '../middlewares/validate.js'
 import { authLimiter } from '../middlewares/rateLimiters.js'
 import {
-  requestOtp,
-  verifyOtp,
-  requestOtpSchema,
-  verifyOtpSchema
+  loginPatient,
+  patientLoginSchema
 } from '../controllers/patientAuthController.js'
 
 const router = Router()
 
-router.post('/request-otp', authLimiter, validate(requestOtpSchema), asyncHandler(requestOtp))
-router.post('/verify-otp', authLimiter, validate(verifyOtpSchema), asyncHandler(verifyOtp))
+router.post('/login', authLimiter, validate(patientLoginSchema), asyncHandler(loginPatient))
 
 export default router
