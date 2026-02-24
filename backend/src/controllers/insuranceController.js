@@ -6,6 +6,8 @@ import { ok, paginated } from '../utils/response.js'
 import { parsePagination, buildPagination } from '../utils/pagination.js'
 import { writeAuditLog } from '../utils/audit.js'
 
+const normalizeInsuranceName = (value) => String(value ?? '').trim().replace(/\s+/g, ' ')
+
 export const listInsurancesSchema = z.object({
   body: z.object({}).optional(),
   params: z.object({}).optional(),
@@ -73,7 +75,46 @@ export const listInsurances = async (req, res) => {
 }
 
 export const createInsurance = async (req, res) => {
-  const item = await HealthInsurance.create(req.validated.body)
+  const payload = {
+    ...req.validated.body,
+    name: normalizeInsuranceName(req.validated.body.name)
+  }
+
+  const existing = await HealthInsurance.findOne({
+    where: {
+      name: {
+        [Op.iLike]: payload.name
+      }
+    },
+    paranoid: false
+  })
+
+  if (existing) {
+    if (existing.deletedAt) {
+      await existing.restore()
+      await existing.update({
+        name: payload.name,
+        discountPercent: payload.discountPercent,
+        isActive: payload.isActive ?? true
+      })
+
+      await writeAuditLog({
+        actorRole: req.auth.role,
+        actorId: req.auth.sub,
+        action: 'INSURANCE_RESTORED',
+        entity: 'HealthInsurance',
+        entityId: existing.id,
+        meta: payload
+      })
+
+      ok(res, existing, 'insurance_restored')
+      return
+    }
+
+    throw new AppError('Ya existe una obra social con ese nombre', 409, 'insurance_conflict')
+  }
+
+  const item = await HealthInsurance.create(payload)
 
   await writeAuditLog({
     actorRole: req.auth.role,
@@ -81,7 +122,7 @@ export const createInsurance = async (req, res) => {
     action: 'INSURANCE_CREATED',
     entity: 'HealthInsurance',
     entityId: item.id,
-    meta: req.validated.body
+    meta: payload
   })
 
   ok(res, item, 'insurance_created', 201)
@@ -93,7 +134,26 @@ export const updateInsurance = async (req, res) => {
     throw new AppError('Obra social no encontrada', 404, 'insurance_not_found')
   }
 
-  await item.update(req.validated.body)
+  const patch = { ...req.validated.body }
+  if (patch.name) {
+    patch.name = normalizeInsuranceName(patch.name)
+    const duplicate = await HealthInsurance.findOne({
+      where: {
+        id: {
+          [Op.ne]: item.id
+        },
+        name: {
+          [Op.iLike]: patch.name
+        }
+      },
+      paranoid: false
+    })
+    if (duplicate) {
+      throw new AppError('Ya existe una obra social con ese nombre', 409, 'insurance_conflict')
+    }
+  }
+
+  await item.update(patch)
 
   await writeAuditLog({
     actorRole: req.auth.role,
@@ -101,7 +161,7 @@ export const updateInsurance = async (req, res) => {
     action: 'INSURANCE_UPDATED',
     entity: 'HealthInsurance',
     entityId: item.id,
-    meta: req.validated.body
+    meta: patch
   })
 
   ok(res, item, 'insurance_updated')

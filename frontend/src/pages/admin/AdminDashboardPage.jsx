@@ -43,7 +43,7 @@ export function AdminDashboardPage () {
   const load = async () => {
     const [specialtyResult, insurancesResult, doctorsResult] = await Promise.all([
       specialtiesService.list({ pageSize: 100, isActive: 'true' }),
-      insurancesService.list({ pageSize: 100, isActive: 'true' }),
+      insurancesService.list({ pageSize: 100 }),
       doctorsService.list({ pageSize: 100 })
     ])
     setSpecialties(specialtyResult.items)
@@ -319,6 +319,7 @@ export function AdminDashboardPage () {
               <div>
                 <p className='font-semibold text-emerald-950'>{insurance.name}</p>
                 <p className='text-xs text-emerald-900/70'>Descuento: {insurance.discountPercent}%</p>
+                <p className='text-xs text-emerald-900/70'>Estado: {insurance.isActive ? 'Activa' : 'Inactiva'}</p>
               </div>
               <Button variant='danger' className='px-3 py-1.5 text-xs' onClick={() => handleDeleteInsurance(insurance.id)}>
                 Eliminar

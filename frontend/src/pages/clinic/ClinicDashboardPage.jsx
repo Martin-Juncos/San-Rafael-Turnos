@@ -62,6 +62,7 @@ export function ClinicDashboardPage () {
   const [blockExistingRanges, setBlockExistingRanges] = useState([])
   const [blockAvailableDates, setBlockAvailableDates] = useState([])
   const [blockAvailabilityLoading, setBlockAvailabilityLoading] = useState(false)
+  const [agendaLoading, setAgendaLoading] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
@@ -407,22 +408,47 @@ export function ClinicDashboardPage () {
     }
   }, [blockDraft.doctorId])
 
-  const loadSlots = async () => {
-    if (!doctorFilters.date || !appointmentFilters.doctorId) return
+  const loadSlots = useCallback(async (options = {}) => {
+    const doctorId = options.doctorId || appointmentFilters.doctorId
+    const date = options.date || doctorFilters.date
+
+    if (!date || !doctorId) {
+      setSlots([])
+      return
+    }
+
+    setAgendaLoading(true)
     try {
       const data = await slotsService.list({
-        doctorId: appointmentFilters.doctorId,
-        date: doctorFilters.date
+        doctorId,
+        date
       })
       setSlots(data.slots)
     } catch (apiError) {
       setError(apiError.message)
+    } finally {
+      setAgendaLoading(false)
     }
-  }
+  }, [appointmentFilters.doctorId, doctorFilters.date])
+
+  useEffect(() => {
+    if (!appointmentFilters.doctorId) {
+      setSlots([])
+      return
+    }
+    loadSlots({
+      doctorId: appointmentFilters.doctorId,
+      date: doctorFilters.date
+    }).catch(() => {})
+  }, [appointmentFilters.doctorId, doctorFilters.date, loadSlots])
 
   const selectedSpecialtyName = useMemo(() => {
     return specialties.find((item) => item.id === doctorFilters.specialtyId)?.name || 'Todas'
   }, [doctorFilters.specialtyId, specialties])
+
+  const selectedAgendaDoctor = useMemo(() => {
+    return doctors.find((item) => item.id === appointmentFilters.doctorId) || null
+  }, [doctors, appointmentFilters.doctorId])
 
   const rescheduleAppointments = useMemo(() => {
     return appointments.filter((appointment) => {
@@ -665,7 +691,16 @@ export function ClinicDashboardPage () {
               </div>
             ))}
           </div>
-          <Button variant='secondary' onClick={loadSlots}>Cargar slots del medico seleccionado</Button>
+          <Button variant='secondary' onClick={() => loadSlots().catch(() => {})}>
+            Cargar horarios disponibles del medico seleccionado
+          </Button>
+          {selectedAgendaDoctor
+            ? (
+                <p className='text-xs text-emerald-900/70'>
+                  Agenda de {selectedAgendaDoctor.fullName} para el dia {formatDateLabel(doctorFilters.date)}.
+                </p>
+              )
+            : <p className='text-xs text-emerald-900/70'>Selecciona un medico para ver su agenda.</p>}
           <div className='flex flex-wrap gap-2'>
             {slots.map((slot) => (
               <span key={slot.startTime} className='rounded-lg bg-white/70 px-3 py-1 text-xs text-emerald-900/80'>
@@ -673,6 +708,12 @@ export function ClinicDashboardPage () {
               </span>
             ))}
           </div>
+          {agendaLoading
+            ? <p className='text-xs text-emerald-900/70'>Buscando horarios disponibles...</p>
+            : null}
+          {!agendaLoading && selectedAgendaDoctor && slots.length === 0
+            ? <p className='text-xs text-amber-700'>No hay horarios disponibles para el dia seleccionado.</p>
+            : null}
         </Card>
 
         <Card className='space-y-4'>
