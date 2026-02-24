@@ -1,0 +1,8 @@
+export { authService } from './authService'
+export { patientAuthService } from './patientAuthService'
+export { specialtiesService } from './specialtiesService'
+export { doctorsService } from './doctorsService'
+export { slotsService } from './slotsService'
+export { appointmentsService } from './appointmentsService'
+export { paymentsService } from './paymentsService'
+export { notificationsService } from './notificationsService'

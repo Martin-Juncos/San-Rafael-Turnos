@@ -1,0 +1,16 @@
+node_modules
+dist
+build
+coverage
+.DS_Store
+*.log
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+backend/dev.sqlite
+.codex/
+CHANGELOG.md
+CONFIG.md
+docs/

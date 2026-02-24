@@ -1,0 +1,13 @@
+module.exports = {
+  root: true,
+  env: {
+    es2022: true,
+    node: true
+  },
+  extends: ['standard'],
+  parserOptions: {
+    ecmaVersion: 'latest',
+    sourceType: 'module'
+  },
+  ignorePatterns: ['node_modules', 'dist']
+}
