@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { Card } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
+import { ActionResultModal } from '../../components/ui/ActionResultModal'
 import { appointmentsService, doctorsService, insurancesService, paymentsService, slotsService, specialtiesService } from '../../api/services'
 import { useAppSelector } from '../../app/hooks'
 import { selectAuth } from '../../features/auth/authSlice'
@@ -61,6 +62,12 @@ export function ReservePage () {
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [mercadoPagoLoading, setMercadoPagoLoading] = useState(false)
   const [paymentError, setPaymentError] = useState('')
+  const [feedbackModal, setFeedbackModal] = useState({
+    open: false,
+    type: 'success',
+    title: '',
+    description: ''
+  })
   const [paymentForm, setPaymentForm] = useState({
     cardNumber: '',
     cardHolder: '',
@@ -95,6 +102,43 @@ export function ReservePage () {
     }
     load().catch((apiError) => setError(apiError.message))
   }, [])
+
+  useEffect(() => {
+    if (!success) return
+    setFeedbackModal({
+      open: true,
+      type: 'success',
+      title: 'Operacion completada',
+      description: success
+    })
+  }, [success])
+
+  useEffect(() => {
+    if (!error) return
+    setFeedbackModal({
+      open: true,
+      type: 'error',
+      title: 'No se pudo completar la operacion',
+      description: error
+    })
+  }, [error])
+
+  useEffect(() => {
+    if (!paymentError) return
+    setFeedbackModal({
+      open: true,
+      type: 'error',
+      title: 'No se pudo completar el pago',
+      description: paymentError
+    })
+  }, [paymentError])
+
+  const closeFeedbackModal = () => {
+    setFeedbackModal((prev) => ({ ...prev, open: false }))
+    setSuccess('')
+    setError('')
+    setPaymentError('')
+  }
 
   const filteredDoctors = useMemo(() => {
     if (!form.specialtyId) return doctors
@@ -267,7 +311,7 @@ export function ReservePage () {
       setHoldResult(data)
       setShowCheckout(true)
       setPaymentError('')
-      setSuccess('Reserva creada. Completa el pago para confirmar tu turno.')
+      setSuccess('La reserva se creo correctamente. Ahora debes completar el pago para confirmar el turno.')
     } catch (apiError) {
       setError(apiError.message)
     }
@@ -361,7 +405,7 @@ export function ReservePage () {
         expiry: '',
         cvv: ''
       })
-      setSuccess('Pago aprobado. Tu turno quedo confirmado.')
+      setSuccess('Pago aprobado. Tu turno quedo confirmado y ya figura en tu panel.')
       summaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     } catch (apiError) {
       setPaymentError(apiError.message)
@@ -597,7 +641,6 @@ export function ReservePage () {
                   Cancelar
                 </Button>
               </div>
-              {paymentError ? <p className='text-sm text-red-600'>{paymentError}</p> : null}
             </div>
           ) : null}
 
@@ -630,11 +673,17 @@ export function ReservePage () {
                 </div>
                 )
               : <p className='text-sm text-emerald-900/70'>Aun no creaste una reserva.</p>}
-            {success ? <p className='text-sm text-emerald-700'>{success}</p> : null}
-            {error ? <p className='text-sm text-red-600'>{error}</p> : null}
           </Card>
         </div>
       </div>
+
+      <ActionResultModal
+        open={feedbackModal.open}
+        type={feedbackModal.type}
+        title={feedbackModal.title}
+        description={feedbackModal.description}
+        onClose={closeFeedbackModal}
+      />
     </div>
   )
 }
