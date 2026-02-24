@@ -35,6 +35,14 @@ const normalizeTimeValue = (value) => {
   return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`
 }
 
+const rangesOverlap = (aStart, aEnd, bStart, bEnd) => {
+  const a1 = parseTimeToMinutes(aStart)
+  const a2 = parseTimeToMinutes(aEnd)
+  const b1 = parseTimeToMinutes(bStart)
+  const b2 = parseTimeToMinutes(bEnd)
+  return a1 < b2 && b1 < a2
+}
+
 export function ClinicDashboardPage () {
   const today = useMemo(() => toLocalIsoDate(), [])
   const [specialties, setSpecialties] = useState([])
@@ -51,6 +59,7 @@ export function ClinicDashboardPage () {
   const [rescheduleAvailabilityLoading, setRescheduleAvailabilityLoading] = useState(false)
   const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false)
   const [blockWeeklyAvailability, setBlockWeeklyAvailability] = useState([])
+  const [blockExistingRanges, setBlockExistingRanges] = useState([])
   const [blockAvailableDates, setBlockAvailableDates] = useState([])
   const [blockAvailabilityLoading, setBlockAvailabilityLoading] = useState(false)
   const [error, setError] = useState('')
@@ -299,6 +308,7 @@ export function ClinicDashboardPage () {
   useEffect(() => {
     if (!blockDraft.doctorId) {
       setBlockWeeklyAvailability([])
+      setBlockExistingRanges([])
       setBlockAvailableDates([])
       return
     }
@@ -320,16 +330,54 @@ export function ClinicDashboardPage () {
             slotMinutes: Number(item.slotMinutes) || 30
           }))
 
+        const existingRanges = (data.blocks || []).map((item) => ({
+          date: item.date,
+          startTime: normalizeTimeValue(item.startTime),
+          endTime: normalizeTimeValue(item.endTime)
+        }))
+
         const dates = buildUpcomingDates(21)
         const withAvailability = dates
           .map((date) => {
             const dayOfWeek = new Date(`${date}T00:00:00`).getDay()
             const ranges = weeklyAvailability.filter((item) => item.dayOfWeek === dayOfWeek)
-            return { date, count: ranges.length }
+            const dayBlocks = existingRanges.filter((item) => item.date === date)
+
+            const freeStartCount = ranges.reduce((accumulator, range) => {
+              const start = parseTimeToMinutes(range.startTime)
+              const end = parseTimeToMinutes(range.endTime)
+              const step = Number(range.slotMinutes) || 30
+              let count = 0
+
+              for (let cursor = start; cursor + step <= end; cursor += step) {
+                const candidateStart = formatMinutesToTime(cursor)
+                let hasAnyValidEnd = false
+
+                for (let endCursor = cursor + step; endCursor <= end; endCursor += step) {
+                  const candidateEnd = formatMinutesToTime(endCursor)
+                  const overlaps = dayBlocks.some((item) =>
+                    rangesOverlap(candidateStart, candidateEnd, item.startTime, item.endTime)
+                  )
+                  if (!overlaps) {
+                    hasAnyValidEnd = true
+                    break
+                  }
+                }
+
+                if (hasAnyValidEnd) {
+                  count += 1
+                }
+              }
+
+              return accumulator + count
+            }, 0)
+
+            return { date, count: freeStartCount }
           })
           .filter((item) => item.count > 0)
 
         setBlockWeeklyAvailability(weeklyAvailability)
+        setBlockExistingRanges(existingRanges)
         setBlockAvailableDates(withAvailability)
 
         if (withAvailability.length === 0) {
@@ -420,6 +468,11 @@ export function ClinicDashboardPage () {
       .sort((a, b) => a.startTime.localeCompare(b.startTime))
   }, [blockDraft.date, blockWeeklyAvailability])
 
+  const blockExistingRangesForDate = useMemo(() => {
+    if (!blockDraft.date) return []
+    return blockExistingRanges.filter((item) => item.date === blockDraft.date)
+  }, [blockDraft.date, blockExistingRanges])
+
   const blockStartOptions = useMemo(() => {
     const startValues = new Set()
     blockDayRanges.forEach((range) => {
@@ -427,11 +480,27 @@ export function ClinicDashboardPage () {
       const end = parseTimeToMinutes(range.endTime)
       const step = Number(range.slotMinutes) || 30
       for (let cursor = start; cursor + step <= end; cursor += step) {
-        startValues.add(formatMinutesToTime(cursor))
+        const candidateStart = formatMinutesToTime(cursor)
+        let hasAnyValidEnd = false
+
+        for (let endCursor = cursor + step; endCursor <= end; endCursor += step) {
+          const candidateEnd = formatMinutesToTime(endCursor)
+          const overlaps = blockExistingRangesForDate.some((item) =>
+            rangesOverlap(candidateStart, candidateEnd, item.startTime, item.endTime)
+          )
+          if (!overlaps) {
+            hasAnyValidEnd = true
+            break
+          }
+        }
+
+        if (hasAnyValidEnd) {
+          startValues.add(candidateStart)
+        }
       }
     })
     return Array.from(startValues).sort((a, b) => a.localeCompare(b))
-  }, [blockDayRanges])
+  }, [blockDayRanges, blockExistingRangesForDate])
 
   const blockEndOptions = useMemo(() => {
     if (!blockDraft.startTime) return []
@@ -449,11 +518,17 @@ export function ClinicDashboardPage () {
       }
 
       for (let cursor = startMinutes + step; cursor <= rangeEnd; cursor += step) {
-        endValues.add(formatMinutesToTime(cursor))
+        const candidateEnd = formatMinutesToTime(cursor)
+        const overlaps = blockExistingRangesForDate.some((item) =>
+          rangesOverlap(blockDraft.startTime, candidateEnd, item.startTime, item.endTime)
+        )
+        if (!overlaps) {
+          endValues.add(candidateEnd)
+        }
       }
     })
     return Array.from(endValues).sort((a, b) => a.localeCompare(b))
-  }, [blockDayRanges, blockDraft.startTime])
+  }, [blockDayRanges, blockDraft.startTime, blockExistingRangesForDate])
 
   const formatDateLabel = (value) => {
     return new Date(`${value}T00:00:00`).toLocaleDateString('es-AR', {
@@ -694,7 +769,7 @@ export function ClinicDashboardPage () {
               ? <p className='text-xs text-amber-700'>No hay dias disponibles para bloquear en los proximos 21 dias.</p>
               : null}
             {!blockAvailabilityLoading && blockDraft.doctorId && blockAvailableDates.length > 0 && blockStartOptions.length === 0
-              ? <p className='text-xs text-amber-700'>No hay horarios configurados para el dia seleccionado.</p>
+              ? <p className='text-xs text-amber-700'>No hay horarios libres para bloquear en el dia seleccionado.</p>
               : null}
             <Input label='Motivo' value={blockDraft.reason} onChange={(event) => setBlockDraft((prev) => ({ ...prev, reason: event.target.value }))} />
             <Button

@@ -134,6 +134,13 @@ const rangeContains = (outerStart, outerEnd, innerStart, innerEnd) => {
   const i2 = parseTimeToMinutes(innerEnd)
   return i1 >= o1 && i2 <= o2
 }
+const rangesOverlap = (aStart, aEnd, bStart, bEnd) => {
+  const a1 = parseTimeToMinutes(aStart)
+  const a2 = parseTimeToMinutes(aEnd)
+  const b1 = parseTimeToMinutes(bStart)
+  const b2 = parseTimeToMinutes(bEnd)
+  return a1 < b2 && b1 < a2
+}
 
 export const listDoctors = async (req, res) => {
   const { query = {} } = req.validated
@@ -391,6 +398,25 @@ export const createDoctorBlock = async (req, res) => {
   )
   if (!insideSchedule) {
     throw new AppError('Solo puedes bloquear horarios dentro de la agenda del medico', 400, 'block_outside_schedule')
+  }
+
+  const existingBlocks = await DoctorBlock.findAll({
+    where: {
+      doctorId,
+      date: req.validated.body.date
+    }
+  })
+
+  const hasOverlap = existingBlocks.some((item) =>
+    rangesOverlap(
+      normalizedStartTime,
+      normalizedEndTime,
+      normalizeTimeValue(item.startTime),
+      normalizeTimeValue(item.endTime)
+    )
+  )
+  if (hasOverlap) {
+    throw new AppError('Ese rango se superpone con un bloqueo existente', 409, 'block_conflict')
   }
 
   const block = await DoctorBlock.create({
