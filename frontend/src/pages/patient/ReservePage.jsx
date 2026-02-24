@@ -58,6 +58,7 @@ export function ReservePage () {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [holdResult, setHoldResult] = useState(null)
+  const [patientAppointments, setPatientAppointments] = useState([])
   const [showCheckout, setShowCheckout] = useState(false)
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [mercadoPagoLoading, setMercadoPagoLoading] = useState(false)
@@ -144,6 +145,24 @@ export function ReservePage () {
     if (!form.specialtyId) return doctors
     return doctors.filter((doctor) => doctor.specialtyId === form.specialtyId)
   }, [doctors, form.specialtyId])
+
+  const loadPatientAppointments = useCallback(async () => {
+    if (auth.role !== 'patient') {
+      setPatientAppointments([])
+      return
+    }
+
+    try {
+      const result = await appointmentsService.listMy({ pageSize: 100 })
+      setPatientAppointments(result.items)
+    } catch (apiError) {
+      setError(apiError.message)
+    }
+  }, [auth.role])
+
+  useEffect(() => {
+    loadPatientAppointments().catch(() => {})
+  }, [loadPatientAppointments])
 
   const fetchSlotsByDate = useCallback(async (doctorId, date, showLoading = true) => {
     if (!doctorId || !date) {
@@ -269,6 +288,7 @@ export function ReservePage () {
           paymentIntent: prev?.paymentIntent ?? null,
           pricing: prev?.pricing ?? null
         }))
+        await loadPatientAppointments()
         setShowCheckout(false)
 
         if (payment.status === 'paid' || mpStatus === 'success') {
@@ -293,7 +313,7 @@ export function ReservePage () {
     return () => {
       isCancelled = true
     }
-  }, [auth.role, location.search])
+  }, [auth.role, location.search, loadPatientAppointments])
 
   const createHold = async () => {
     setError('')
@@ -309,6 +329,7 @@ export function ReservePage () {
       }
       const data = await appointmentsService.create(payload)
       setHoldResult(data)
+      await loadPatientAppointments()
       setShowCheckout(true)
       setPaymentError('')
       setSuccess('La reserva se creo correctamente. Ahora debes completar el pago para confirmar el turno.')
@@ -405,6 +426,7 @@ export function ReservePage () {
         expiry: '',
         cvv: ''
       })
+      await loadPatientAppointments()
       setSuccess('Pago aprobado. Tu turno quedo confirmado y ya figura en tu panel.')
       summaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     } catch (apiError) {
@@ -414,11 +436,71 @@ export function ReservePage () {
     }
   }
 
+  const formatMoney = (value) => {
+    const amount = Number(value)
+    if (Number.isNaN(amount)) return '-'
+    return new Intl.NumberFormat('es-AR', {
+      style: 'currency',
+      currency: 'ARS',
+      maximumFractionDigits: 2
+    }).format(amount)
+  }
+
+  const currentReservation = useMemo(() => {
+    if (!holdResult?.appointment) return null
+
+    const appointment = holdResult.appointment
+    const payment = holdResult.payment
+    const doctorName =
+      appointment.doctor?.fullName ||
+      doctors.find((item) => item.id === appointment.doctorId)?.fullName ||
+      doctors.find((item) => item.id === form.doctorId)?.fullName ||
+      'Profesional seleccionado'
+    const specialtyName =
+      appointment.specialty?.name ||
+      specialties.find((item) => item.id === appointment.specialtyId)?.name ||
+      specialties.find((item) => item.id === form.specialtyId)?.name ||
+      'Especialidad seleccionada'
+    const insuranceName =
+      appointment.insurance?.name ||
+      insurances.find((item) => item.id === appointment.insuranceId)?.name ||
+      insurances.find((item) => item.id === form.insuranceId)?.name ||
+      'Particular'
+    const date = appointment.date || form.date
+    const startTime = (appointment.startTime || form.startTime || '').slice(0, 5)
+    const paidAmount = holdResult.pricing?.finalAmount ?? payment?.amount ?? 0
+
+    return {
+      doctorName,
+      specialtyName,
+      insuranceName,
+      date,
+      startTime,
+      appointmentStatus: appointmentStatusLabels[appointment.status] || appointment.status,
+      paymentStatus: paymentStatusLabels[payment?.status] || payment?.status || 'Sin pago',
+      paidAmount
+    }
+  }, [holdResult, doctors, specialties, insurances, form.doctorId, form.specialtyId, form.insuranceId, form.date, form.startTime])
+
+  const appointmentsForList = useMemo(() => {
+    return patientAppointments.filter((item) => item.id !== holdResult?.appointment?.id)
+  }, [patientAppointments, holdResult?.appointment?.id])
+
   const formatDateLabel = (value) => {
     return new Date(`${value}T00:00:00`).toLocaleDateString('es-AR', {
       weekday: 'short',
       day: '2-digit',
       month: '2-digit'
+    })
+  }
+
+  const formatDateLongLabel = (value) => {
+    if (!value) return '-'
+    return new Date(`${value}T00:00:00`).toLocaleDateString('es-AR', {
+      weekday: 'long',
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric'
     })
   }
 
@@ -654,25 +736,41 @@ export function ReservePage () {
         <div ref={summaryRef}>
           <Card className='space-y-2'>
             <h2 className='text-lg font-semibold text-emerald-950'>Resumen de reserva</h2>
-            {holdResult
+            {currentReservation
               ? (
                 <div className='space-y-1 text-sm text-emerald-900/80'>
-                  <p>Reserva: {holdResult.appointment.id}</p>
-                  <p>Estado del turno: {appointmentStatusLabels[holdResult.appointment.status] || holdResult.appointment.status}</p>
-                  <p>Estado del pago: {paymentStatusLabels[holdResult.payment.status] || holdResult.payment.status}</p>
-                  <p>Monto a pagar: ${holdResult.payment.amount}</p>
-                  {holdResult.pricing
-                    ? (
-                      <>
-                        <p>Arancel base: ${holdResult.pricing.baseAmount}</p>
-                        <p>Descuento aplicado: {holdResult.pricing.discountPercent}%</p>
-                        <p>Monto final: ${holdResult.pricing.finalAmount}</p>
-                      </>
-                      )
-                    : null}
+                  <p><span className='font-semibold'>Medico:</span> {currentReservation.doctorName}</p>
+                  <p><span className='font-semibold'>Especialidad:</span> {currentReservation.specialtyName}</p>
+                  <p><span className='font-semibold'>Dia:</span> {formatDateLongLabel(currentReservation.date)}</p>
+                  <p><span className='font-semibold'>Horario:</span> {currentReservation.startTime || '-'}</p>
+                  <p><span className='font-semibold'>Cobertura:</span> {currentReservation.insuranceName}</p>
+                  <p><span className='font-semibold'>Estado del turno:</span> {currentReservation.appointmentStatus}</p>
+                  <p><span className='font-semibold'>Estado del pago:</span> {currentReservation.paymentStatus}</p>
+                  <p><span className='font-semibold'>Monto pagado:</span> {formatMoney(currentReservation.paidAmount)}</p>
                 </div>
                 )
               : <p className='text-sm text-emerald-900/70'>Aun no creaste una reserva.</p>}
+
+            <div className='space-y-2 pt-3'>
+              <h3 className='text-sm font-semibold text-emerald-950'>Mis turnos</h3>
+              {appointmentsForList.length === 0
+                ? <p className='text-xs text-emerald-900/70'>No tenes otros turnos registrados.</p>
+                : (
+                    <div className='space-y-2'>
+                      {appointmentsForList.map((appointment) => (
+                        <div key={appointment.id} className='rounded-xl border border-emerald-200/70 bg-white/70 p-3 text-xs text-emerald-900/80'>
+                          <p className='font-semibold text-emerald-950'>
+                            {appointment.doctor?.fullName || 'Profesional'} - {appointment.specialty?.name || 'Especialidad'}
+                          </p>
+                          <p>{formatDateLongLabel(appointment.date)} {appointment.startTime?.slice(0, 5) || '-'}</p>
+                          <p>Estado del turno: {appointmentStatusLabels[appointment.status] || appointment.status}</p>
+                          <p>Estado del pago: {paymentStatusLabels[appointment.payment?.status] || appointment.payment?.status || 'Sin pago'}</p>
+                          <p>Monto: {formatMoney(appointment.payment?.amount ?? 0)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+            </div>
           </Card>
         </div>
       </div>

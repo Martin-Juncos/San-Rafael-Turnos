@@ -14,6 +14,9 @@ export function AppHeader () {
   const auth = useAppSelector(selectAuth)
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
+  const identityLabel = auth.role === 'patient'
+    ? (auth.patient?.fullName || auth.patient?.dni)
+    : auth.user?.email
 
   const handleLogout = () => {
     dispatch(clearSession())
@@ -46,7 +49,7 @@ export function AppHeader () {
             ? (
               <>
                 <span className='hidden text-xs font-medium text-emerald-900/70 sm:block'>
-                  {auth.user?.email || auth.patient?.dni}
+                  {identityLabel}
                 </span>
                 <Button variant='secondary' onClick={handleLogout}>Salir</Button>
               </>
