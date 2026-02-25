@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ArrowRight, CalendarCheck2, Home } from 'lucide-react'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { specialtiesService } from '../../api/services'
@@ -46,8 +47,22 @@ export function SpecialtiesPage () {
           Conoce todas las especialidades activas de la Clinica San Rafael Arcangel.
         </p>
         <div className='flex flex-wrap gap-3'>
-          <Link to='/'><Button variant='secondary'>Volver al inicio</Button></Link>
-          <Link to='/reservar'><Button>Reservar turno</Button></Link>
+          <Link to='/'>
+            <Button variant='secondary'>
+              <span className='inline-flex items-center gap-2'>
+                <Home className='h-4 w-4' />
+                Volver al inicio
+              </span>
+            </Button>
+          </Link>
+          <Link to='/reservar'>
+            <Button>
+              <span className='inline-flex items-center gap-2'>
+                <CalendarCheck2 className='h-4 w-4' />
+                Reservar turno
+              </span>
+            </Button>
+          </Link>
         </div>
       </section>
 
@@ -64,7 +79,10 @@ export function SpecialtiesPage () {
                   <p className='text-sm text-emerald-900/80'>
                     {specialty.description?.trim() || 'Descripcion no disponible por el momento.'}
                   </p>
-                  <p className='text-xs font-semibold text-brand-700'>Ver profesionales -&gt;</p>
+                  <p className='inline-flex items-center gap-1 text-xs font-semibold text-brand-700'>
+                    Ver profesionales
+                    <ArrowRight className='h-3.5 w-3.5' />
+                  </p>
                 </Card>
               </Link>
             ))}

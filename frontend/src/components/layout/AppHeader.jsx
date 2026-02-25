@@ -1,5 +1,6 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
+import { Building2, CalendarDays, House, LayoutDashboard, LogIn, LogOut, Newspaper } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '../../app/hooks'
 import { clearSession, selectAuth } from '../../features/auth/authSlice'
 import { Button } from '../ui/Button'
@@ -24,6 +25,8 @@ export function AppHeader () {
     dispatch(clearSession())
     navigate('/ingresar')
   }
+
+  const navItemClassName = 'inline-flex items-center gap-1 text-sm text-emerald-900/80 hover:text-emerald-950'
 
   return (
     <header className='sticky top-0 z-40 border-b border-emerald-200/70 bg-white/45 backdrop-blur-xl'>
@@ -52,14 +55,32 @@ export function AppHeader () {
         </div>
 
         <nav className='hidden items-center gap-3 md:flex'>
-          <NavLink to='/' className='text-sm text-emerald-900/80 hover:text-emerald-950'>Inicio</NavLink>
-          <NavLink to='/sobre-nosotros' className='text-sm text-emerald-900/80 hover:text-emerald-950'>Sobre nosotros</NavLink>
-          <NavLink to='/noticias' className='text-sm text-emerald-900/80 hover:text-emerald-950'>Noticias</NavLink>
-          <NavLink to='/reservar' className='text-sm text-emerald-900/80 hover:text-emerald-950'>Reservar</NavLink>
+          <NavLink to='/' className={navItemClassName}>
+            <House className='h-4 w-4' />
+            Inicio
+          </NavLink>
+          <NavLink to='/sobre-nosotros' className={navItemClassName}>
+            <Building2 className='h-4 w-4' />
+            Sobre nosotros
+          </NavLink>
+          <NavLink to='/noticias' className={navItemClassName}>
+            <Newspaper className='h-4 w-4' />
+            Noticias
+          </NavLink>
+          <NavLink to='/reservar' className={navItemClassName}>
+            <CalendarDays className='h-4 w-4' />
+            Reservar
+          </NavLink>
           {auth.role ? (
-            <NavLink to={rolePath[auth.role]} className='text-sm text-emerald-900/80 hover:text-emerald-950'>Panel</NavLink>
+            <NavLink to={rolePath[auth.role]} className={navItemClassName}>
+              <LayoutDashboard className='h-4 w-4' />
+              Panel
+            </NavLink>
           ) : (
-            <NavLink to='/ingresar' className='text-sm text-emerald-900/80 hover:text-emerald-950'>Ingresar</NavLink>
+            <NavLink to='/ingresar' className={navItemClassName}>
+              <LogIn className='h-4 w-4' />
+              Ingresar
+            </NavLink>
           )}
         </nav>
 
@@ -70,10 +91,24 @@ export function AppHeader () {
                 <span className='hidden text-xs font-medium text-emerald-900/70 sm:block'>
                   {identityLabel}
                 </span>
-                <Button variant='secondary' onClick={handleLogout}>Salir</Button>
+                <Button variant='secondary' onClick={handleLogout}>
+                  <span className='inline-flex items-center gap-2'>
+                    <LogOut className='h-4 w-4' />
+                    Salir
+                  </span>
+                </Button>
               </>
               )
-            : <Link to='/ingresar'><Button>Ingresar</Button></Link>}
+            : (
+              <Link to='/ingresar'>
+                <Button>
+                  <span className='inline-flex items-center gap-2'>
+                    <LogIn className='h-4 w-4' />
+                    Ingresar
+                  </span>
+                </Button>
+              </Link>
+              )}
         </div>
       </div>
     </header>

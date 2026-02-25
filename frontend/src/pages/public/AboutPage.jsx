@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Building2, CalendarCheck2, Home, Sparkles, Stethoscope, Users } from 'lucide-react'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 
@@ -54,6 +55,13 @@ const galleryItems = [
   }
 ]
 
+const sectionIconMap = {
+  identidad: Building2,
+  equipo: Users,
+  instalaciones: Stethoscope,
+  'mejora-continua': Sparkles
+}
+
 function AboutGalleryImage ({ src, title }) {
   const [failed, setFailed] = useState(false)
 
@@ -98,8 +106,22 @@ export function AboutPage () {
         </div>
 
         <div className='flex flex-wrap gap-3'>
-          <Link to='/'><Button variant='secondary'>Volver al inicio</Button></Link>
-          <Link to='/reservar'><Button>Reservar turno</Button></Link>
+          <Link to='/'>
+            <Button variant='secondary'>
+              <span className='inline-flex items-center gap-2'>
+                <Home className='h-4 w-4' />
+                Volver al inicio
+              </span>
+            </Button>
+          </Link>
+          <Link to='/reservar'>
+            <Button>
+              <span className='inline-flex items-center gap-2'>
+                <CalendarCheck2 className='h-4 w-4' />
+                Reservar turno
+              </span>
+            </Button>
+          </Link>
         </div>
       </section>
 
@@ -110,8 +132,12 @@ export function AboutPage () {
             <a
               key={`section-nav-${section.id}`}
               href={`#${section.id}`}
-              className='rounded-full border border-emerald-200 bg-white/70 px-3 py-1 text-xs font-semibold text-emerald-900 transition hover:border-brand-300 hover:text-brand-700'
+              className='inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white/70 px-3 py-1 text-xs font-semibold text-emerald-900 transition hover:border-brand-300 hover:text-brand-700'
             >
+              {(() => {
+                const SectionIcon = sectionIconMap[section.id]
+                return SectionIcon ? <SectionIcon className='h-3.5 w-3.5' /> : null
+              })()}
               {section.title}
             </a>
           ))}
@@ -123,7 +149,11 @@ export function AboutPage () {
           <section key={section.id} id={section.id} className='scroll-mt-24'>
             <Card className='space-y-4'>
               <div className='flex items-center gap-3'>
-                <h3 className='inline-flex rounded-full bg-brand-100 px-4 py-1.5 text-sm font-semibold text-brand-700'>
+                <h3 className='inline-flex items-center gap-1 rounded-full bg-brand-100 px-4 py-1.5 text-sm font-semibold text-brand-700'>
+                  {(() => {
+                    const SectionIcon = sectionIconMap[section.id]
+                    return SectionIcon ? <SectionIcon className='h-4 w-4' /> : null
+                  })()}
                   {section.title}
                 </h3>
               </div>

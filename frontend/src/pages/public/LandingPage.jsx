@@ -1,5 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import {
+  ArrowRight,
+  CalendarCheck2,
+  CircleDollarSign,
+  Clock3,
+  Facebook,
+  Instagram,
+  LogIn,
+  Mail,
+  MapPin,
+  MessageCircle,
+  Phone,
+  Stethoscope
+} from 'lucide-react'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { NewsCard } from '../../components/public/NewsCard'
@@ -219,16 +233,39 @@ export function LandingPage () {
               Gestiona agendas por especialidad y medico, evita sobre-reservas y confirma turnos en minutos con una experiencia digital simple y confiable.
             </p>
             <div className='flex flex-wrap gap-3'>
-              <Link to='/reservar'><Button>Reservar turno</Button></Link>
-              <Link to='/ingresar'><Button variant='secondary'>Ingresar</Button></Link>
+              <Link to='/reservar'>
+                <Button>
+                  <span className='inline-flex items-center gap-2'>
+                    <CalendarCheck2 className='h-4 w-4' />
+                    Reservar turno
+                  </span>
+                </Button>
+              </Link>
+              <Link to='/ingresar'>
+                <Button variant='secondary'>
+                  <span className='inline-flex items-center gap-2'>
+                    <LogIn className='h-4 w-4' />
+                    Ingresar
+                  </span>
+                </Button>
+              </Link>
             </div>
           </div>
           <Card className='space-y-3 bg-white/65'>
             <p className='text-sm font-semibold text-emerald-900'>Como funciona</p>
             <ol className='space-y-2 text-sm text-emerald-900/80'>
-              <li>1. Elige especialidad, medico y horario.</li>
-              <li>2. Completa tus datos y bloquea el turno por 10 minutos.</li>
-              <li>3. Realiza el pago online y confirma por WhatsApp.</li>
+              <li className='flex items-start gap-2'>
+                <Stethoscope className='mt-0.5 h-4 w-4 text-brand-700' />
+                <span>Elige especialidad, medico y horario.</span>
+              </li>
+              <li className='flex items-start gap-2'>
+                <Clock3 className='mt-0.5 h-4 w-4 text-brand-700' />
+                <span>Completa tus datos y bloquea el turno por 10 minutos.</span>
+              </li>
+              <li className='flex items-start gap-2'>
+                <CircleDollarSign className='mt-0.5 h-4 w-4 text-brand-700' />
+                <span>Realiza el pago online y confirma por WhatsApp.</span>
+              </li>
             </ol>
           </Card>
         </div>
@@ -261,8 +298,9 @@ export function LandingPage () {
               <p className='text-sm leading-relaxed text-emerald-900/85'>
                 Porque creemos que una buena atencion medica no depende solo del diagnostico, sino tambien de como acompanamos a cada paciente desde el primer contacto. En Clinica San Rafael Arcangel combinamos trato cercano, organizacion y procesos modernos para brindar una experiencia mas agil, clara y confiable para pacientes, profesionales y equipos administrativos.
               </p>
-              <Link to='/sobre-nosotros' className='inline-flex text-sm font-semibold text-brand-700 hover:text-brand-800'>
-                Conoscanos mejor aca -&gt;
+              <Link to='/sobre-nosotros' className='inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:text-brand-800'>
+                Conoscanos mejor aca
+                <ArrowRight className='h-4 w-4' />
               </Link>
             </div>
           </div>
@@ -300,8 +338,9 @@ export function LandingPage () {
             )
           : null}
         <div className='pt-1'>
-          <Link to='/especialidades' className='text-sm font-semibold text-brand-700 hover:text-brand-800'>
-            Ver todas -&gt;
+          <Link to='/especialidades' className='inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:text-brand-800'>
+            Ver todas
+            <ArrowRight className='h-4 w-4' />
           </Link>
         </div>
       </section>
@@ -392,8 +431,9 @@ export function LandingPage () {
             )
           : null}
         <div className='pt-1'>
-          <Link to='/profesionales' className='text-sm font-semibold text-brand-700 hover:text-brand-800'>
-            Ver todos -&gt;
+          <Link to='/profesionales' className='inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:text-brand-800'>
+            Ver todos
+            <ArrowRight className='h-4 w-4' />
           </Link>
         </div>
       </section>
@@ -421,8 +461,9 @@ export function LandingPage () {
             )
           : null}
         <div className='pt-1'>
-          <Link to='/noticias' className='text-sm font-semibold text-brand-700 hover:text-brand-800'>
-            Ver mas noticias -&gt;
+          <Link to='/noticias' className='inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:text-brand-800'>
+            Ver mas noticias
+            <ArrowRight className='h-4 w-4' />
           </Link>
         </div>
       </section>
@@ -430,16 +471,36 @@ export function LandingPage () {
       <section id='contacto' className='grid gap-4 md:grid-cols-2'>
         <Card>
           <h3 className='text-lg font-semibold text-emerald-950'>Contacto</h3>
-          <p className='mt-2 text-sm text-emerald-900/80'>Av. San Martin 1234, San Rafael, Mendoza</p>
-          <p className='text-sm text-emerald-900/80'>Telefono: +54 260 412-3456</p>
-          <p className='text-sm text-emerald-900/80'>Email: contacto@sanrafaelturnos.com</p>
+          <div className='mt-3 space-y-2 text-sm text-emerald-900/80'>
+            <p className='flex items-start gap-2'>
+              <MapPin className='mt-0.5 h-4 w-4 text-brand-700' />
+              <span>Av. San Martin 1234, San Rafael, Mendoza</span>
+            </p>
+            <p className='flex items-center gap-2'>
+              <Phone className='h-4 w-4 text-brand-700' />
+              <span>+54 260 412-3456</span>
+            </p>
+            <p className='flex items-center gap-2'>
+              <Mail className='h-4 w-4 text-brand-700' />
+              <span>contacto@sanrafaelturnos.com</span>
+            </p>
+          </div>
         </Card>
         <Card>
           <h3 className='text-lg font-semibold text-emerald-950'>Redes</h3>
           <div className='mt-2 flex flex-wrap gap-2 text-sm text-emerald-900/80'>
-            <span className='rounded-lg bg-white/70 px-3 py-1'>Instagram</span>
-            <span className='rounded-lg bg-white/70 px-3 py-1'>Facebook</span>
-            <span className='rounded-lg bg-white/70 px-3 py-1'>WhatsApp</span>
+            <span className='inline-flex items-center gap-1 rounded-lg bg-white/70 px-3 py-1'>
+              <Instagram className='h-4 w-4 text-brand-700' />
+              Instagram
+            </span>
+            <span className='inline-flex items-center gap-1 rounded-lg bg-white/70 px-3 py-1'>
+              <Facebook className='h-4 w-4 text-brand-700' />
+              Facebook
+            </span>
+            <span className='inline-flex items-center gap-1 rounded-lg bg-white/70 px-3 py-1'>
+              <MessageCircle className='h-4 w-4 text-brand-700' />
+              WhatsApp
+            </span>
           </div>
         </Card>
       </section>

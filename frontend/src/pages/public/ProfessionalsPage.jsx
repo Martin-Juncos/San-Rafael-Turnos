@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { CalendarCheck2, Clock3, Home } from 'lucide-react'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { doctorsService, slotsService } from '../../api/services'
@@ -150,8 +151,22 @@ export function ProfessionalsPage () {
           Revisa todos los profesionales, su especialidad y la disponibilidad de atencion.
         </p>
         <div className='flex flex-wrap gap-3'>
-          <Link to='/'><Button variant='secondary'>Volver al inicio</Button></Link>
-          <Link to='/reservar'><Button>Reservar turno</Button></Link>
+          <Link to='/'>
+            <Button variant='secondary'>
+              <span className='inline-flex items-center gap-2'>
+                <Home className='h-4 w-4' />
+                Volver al inicio
+              </span>
+            </Button>
+          </Link>
+          <Link to='/reservar'>
+            <Button>
+              <span className='inline-flex items-center gap-2'>
+                <CalendarCheck2 className='h-4 w-4' />
+                Reservar turno
+              </span>
+            </Button>
+          </Link>
         </div>
       </section>
 
@@ -175,7 +190,10 @@ export function ProfessionalsPage () {
                     className='px-4 py-2 text-sm'
                     onClick={() => toggleDoctorAgenda(doctor.id)}
                   >
-                    {expandedDoctorId === doctor.id ? 'Ocultar disponibilidad' : 'Ver disponibilidad'}
+                    <span className='inline-flex items-center gap-2'>
+                      <Clock3 className='h-4 w-4' />
+                      {expandedDoctorId === doctor.id ? 'Ocultar disponibilidad' : 'Ver disponibilidad'}
+                    </span>
                   </Button>
                 </div>
 
