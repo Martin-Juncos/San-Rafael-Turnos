@@ -1,4 +1,5 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import { useAppDispatch, useAppSelector } from '../../app/hooks'
 import { clearSession, selectAuth } from '../../features/auth/authSlice'
 import { Button } from '../ui/Button'
@@ -14,6 +15,7 @@ export function AppHeader () {
   const auth = useAppSelector(selectAuth)
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
+  const [logoImageError, setLogoImageError] = useState(false)
   const identityLabel = auth.role === 'patient'
     ? (auth.patient?.fullName || auth.patient?.dni)
     : auth.user?.email
@@ -27,7 +29,22 @@ export function AppHeader () {
     <header className='sticky top-0 z-40 border-b border-emerald-200/70 bg-white/45 backdrop-blur-xl'>
       <div className='mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8'>
         <div className='flex items-center gap-3'>
-          <div className='h-9 w-9 rounded-xl bg-brand-600 text-center text-lg font-bold leading-9 text-white shadow-md'>SR</div>
+          <div className='h-11 w-11 overflow-hidden rounded-xl bg-white/75 shadow-sm ring-1 ring-emerald-200'>
+            {!logoImageError
+              ? (
+                <img
+                  src='/logo-san-rafael.png'
+                  alt='San Rafael Turnos'
+                  className='h-full w-full object-contain'
+                  onError={() => setLogoImageError(true)}
+                />
+                )
+              : (
+                <div className='flex h-full w-full items-center justify-center rounded-xl bg-brand-600 text-lg font-bold text-white'>
+                  SR
+                </div>
+                )}
+          </div>
           <div>
             <p className='text-sm font-semibold leading-tight'>San Rafael Turnos</p>
             <p className='text-xs text-emerald-900/70'>Clinica San Rafael Arcangel</p>
