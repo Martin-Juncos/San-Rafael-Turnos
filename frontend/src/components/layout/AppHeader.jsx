@@ -53,6 +53,7 @@ export function AppHeader () {
 
         <nav className='hidden items-center gap-3 md:flex'>
           <NavLink to='/' className='text-sm text-emerald-900/80 hover:text-emerald-950'>Inicio</NavLink>
+          <NavLink to='/sobre-nosotros' className='text-sm text-emerald-900/80 hover:text-emerald-950'>Sobre nosotros</NavLink>
           <NavLink to='/noticias' className='text-sm text-emerald-900/80 hover:text-emerald-950'>Noticias</NavLink>
           <NavLink to='/reservar' className='text-sm text-emerald-900/80 hover:text-emerald-950'>Reservar</NavLink>
           {auth.role ? (

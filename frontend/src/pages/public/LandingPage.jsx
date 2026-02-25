@@ -46,6 +46,7 @@ export function LandingPage () {
   const [newsItems, setNewsItems] = useState([])
   const [newsLoading, setNewsLoading] = useState(true)
   const [newsError, setNewsError] = useState('')
+  const [aboutImageFailed, setAboutImageFailed] = useState(false)
 
   useEffect(() => {
     let isCancelled = false
@@ -233,6 +234,41 @@ export function LandingPage () {
         </div>
       </section>
 
+      <section id='sobre-nosotros' className='space-y-4'>
+        <h2 className='text-2xl font-semibold text-emerald-950'>Sobre nosotros</h2>
+        <Card className='overflow-hidden p-0'>
+          <div className='grid gap-0 md:grid-cols-[0.85fr_1.15fr] md:items-stretch'>
+            <div className='h-48 bg-emerald-100 md:h-full md:min-h-[230px]'>
+              {aboutImageFailed
+                ? (
+                  <div className='flex h-full items-center justify-center px-6 text-center text-sm font-medium text-emerald-900/80'>
+                    Imagen frontal de la clinica pendiente de carga
+                  </div>
+                  )
+                : (
+                  <img
+                    src='/about/frente-clinica.png'
+                    alt='Frente de Clinica San Rafael Arcangel'
+                    className='h-full w-full object-cover'
+                    onError={() => setAboutImageFailed(true)}
+                  />
+                  )}
+            </div>
+            <div className='flex h-full flex-col justify-center gap-4 p-6 md:p-7'>
+              <h3 className='text-xl font-semibold text-emerald-950'>
+                Salud de calidad con cercania, organizacion e innovacion.
+              </h3>
+              <p className='text-sm leading-relaxed text-emerald-900/85'>
+                Porque creemos que una buena atencion medica no depende solo del diagnostico, sino tambien de como acompanamos a cada paciente desde el primer contacto. En Clinica San Rafael Arcangel combinamos trato cercano, organizacion y procesos modernos para brindar una experiencia mas agil, clara y confiable para pacientes, profesionales y equipos administrativos.
+              </p>
+              <Link to='/sobre-nosotros' className='inline-flex text-sm font-semibold text-brand-700 hover:text-brand-800'>
+                Conoscanos mejor aca -&gt;
+              </Link>
+            </div>
+          </div>
+        </Card>
+      </section>
+
       <section id='especialidades' className='space-y-4'>
         <h2 className='text-2xl font-semibold text-emerald-950'>Especialidades</h2>
         {specialtiesLoading
@@ -389,15 +425,6 @@ export function LandingPage () {
             Ver mas noticias -&gt;
           </Link>
         </div>
-      </section>
-
-      <section id='sobre-nosotros' className='space-y-4'>
-        <h2 className='text-2xl font-semibold text-emerald-950'>Sobre nosotros</h2>
-        <Card>
-          <p className='text-sm text-emerald-900/80'>
-            Trabajamos para brindar una atencion medica cercana, ordenada y moderna, integrando canales digitales que mejoran la experiencia de pacientes y equipos clinicos.
-          </p>
-        </Card>
       </section>
 
       <section id='contacto' className='grid gap-4 md:grid-cols-2'>
