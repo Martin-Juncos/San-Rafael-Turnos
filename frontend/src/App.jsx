@@ -5,6 +5,8 @@ import { LandingPage } from './pages/public/LandingPage'
 import { SpecialtiesPage } from './pages/public/SpecialtiesPage'
 import { SpecialtyDoctorsPage } from './pages/public/SpecialtyDoctorsPage'
 import { ProfessionalsPage } from './pages/public/ProfessionalsPage'
+import { NewsPage } from './pages/public/NewsPage'
+import { NewsDetailPage } from './pages/public/NewsDetailPage'
 import { LoginPage } from './pages/public/LoginPage'
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage'
 import { ClinicDashboardPage } from './pages/clinic/ClinicDashboardPage'
@@ -23,6 +25,8 @@ function App () {
           <Route path='/especialidades' element={<SpecialtiesPage />} />
           <Route path='/especialidades/:specialtyId/profesionales' element={<SpecialtyDoctorsPage />} />
           <Route path='/profesionales' element={<ProfessionalsPage />} />
+          <Route path='/noticias' element={<NewsPage />} />
+          <Route path='/noticias/:newsId' element={<NewsDetailPage />} />
           <Route path='/ingresar' element={<LoginPage />} />
           <Route path='/reservar' element={<ReservePage />} />
 

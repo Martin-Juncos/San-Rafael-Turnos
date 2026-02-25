@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
-import { doctorsService, slotsService, specialtiesService } from '../../api/services'
+import { NewsCard } from '../../components/public/NewsCard'
+import { doctorsService, newsService, slotsService, specialtiesService } from '../../api/services'
 
 const toLocalIsoDate = (date = new Date()) => {
   const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000))
@@ -42,6 +43,9 @@ export function LandingPage () {
   const [availableDates, setAvailableDates] = useState([])
   const [slotsByDate, setSlotsByDate] = useState({})
   const [selectedDate, setSelectedDate] = useState('')
+  const [newsItems, setNewsItems] = useState([])
+  const [newsLoading, setNewsLoading] = useState(true)
+  const [newsError, setNewsError] = useState('')
 
   useEffect(() => {
     let isCancelled = false
@@ -110,6 +114,32 @@ export function LandingPage () {
     () => doctors.slice(0, 3),
     [doctors]
   )
+
+  useEffect(() => {
+    let isCancelled = false
+
+    const loadNews = async () => {
+      setNewsLoading(true)
+      setNewsError('')
+      try {
+        const result = await newsService.list({ limit: 3 })
+        if (isCancelled) return
+        setNewsItems(result.items)
+      } catch (apiError) {
+        if (isCancelled) return
+        setNewsError(apiError.message || 'No se pudieron cargar las noticias.')
+      } finally {
+        if (!isCancelled) {
+          setNewsLoading(false)
+        }
+      }
+    }
+
+    loadNews().catch(() => {})
+    return () => {
+      isCancelled = true
+    }
+  }, [])
 
   const selectedSlots = useMemo(
     () => slotsByDate[selectedDate] || [],
@@ -334,9 +364,31 @@ export function LandingPage () {
 
       <section id='noticias' className='space-y-4'>
         <h2 className='text-2xl font-semibold text-emerald-950'>Noticias</h2>
-        <Card>
-          <p className='text-sm text-emerald-900/80'>MVP: este modulo utiliza contenido mock hasta la publicacion editorial definitiva.</p>
-        </Card>
+        {newsLoading
+          ? <Card className='p-4 text-sm text-emerald-900/75'>Cargando noticias...</Card>
+          : null}
+        {!newsLoading && newsError
+          ? <Card className='p-4 text-sm text-red-600'>{newsError}</Card>
+          : null}
+        {!newsLoading && !newsError
+          ? (
+            <>
+              <div className='grid gap-4 md:grid-cols-3'>
+                {newsItems.map((item) => (
+                  <NewsCard key={item.id} item={item} compact />
+                ))}
+              </div>
+              {newsItems.length === 0
+                ? <Card className='p-4 text-sm text-emerald-900/75'>No hay noticias disponibles en este momento.</Card>
+                : null}
+            </>
+            )
+          : null}
+        <div className='pt-1'>
+          <Link to='/noticias' className='text-sm font-semibold text-brand-700 hover:text-brand-800'>
+            Ver mas noticias -&gt;
+          </Link>
+        </div>
       </section>
 
       <section id='sobre-nosotros' className='space-y-4'>
