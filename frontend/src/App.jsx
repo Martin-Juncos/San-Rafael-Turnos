@@ -2,6 +2,8 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppHeader } from './components/layout/AppHeader'
 import { ProtectedRoute } from './components/layout/ProtectedRoute'
 import { LandingPage } from './pages/public/LandingPage'
+import { SpecialtiesPage } from './pages/public/SpecialtiesPage'
+import { SpecialtyDoctorsPage } from './pages/public/SpecialtyDoctorsPage'
 import { LoginPage } from './pages/public/LoginPage'
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage'
 import { ClinicDashboardPage } from './pages/clinic/ClinicDashboardPage'
@@ -17,6 +19,8 @@ function App () {
       <main className='mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8'>
         <Routes>
           <Route path='/' element={<LandingPage />} />
+          <Route path='/especialidades' element={<SpecialtiesPage />} />
+          <Route path='/especialidades/:specialtyId/profesionales' element={<SpecialtyDoctorsPage />} />
           <Route path='/ingresar' element={<LoginPage />} />
           <Route path='/reservar' element={<ReservePage />} />
 

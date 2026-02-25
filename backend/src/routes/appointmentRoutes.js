@@ -43,6 +43,6 @@ router.post(
   asyncHandler(rescheduleAppointment)
 )
 router.get('/:id/messages', messagesLimiter, authenticateJwt, validate(appointmentMessagesSchema), asyncHandler(getMessagesByAppointment))
-router.post('/:id/messages', authenticateJwt, validate(postMessageSchema), asyncHandler(postMessageByAppointment))
+router.post('/:id/messages', messagesLimiter, authenticateJwt, validate(postMessageSchema), asyncHandler(postMessageByAppointment))
 
 export default router

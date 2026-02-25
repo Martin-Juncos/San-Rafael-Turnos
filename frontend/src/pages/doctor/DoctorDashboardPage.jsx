@@ -15,6 +15,8 @@ const latestMessageKey = (list = []) => {
   return latest ? `${latest.id}:${latest.createdAt}` : ''
 }
 
+const RATE_LIMIT_BACKOFF_MS = 30000
+
 export function DoctorDashboardPage () {
   const [appointments, setAppointments] = useState([])
   const [selectedAppointmentId, setSelectedAppointmentId] = useState('')
@@ -35,6 +37,7 @@ export function DoctorDashboardPage () {
   const unreadSnapshotRef = useRef([])
   const pollCursorRef = useRef(0)
   const sessionStartedAtRef = useRef(Date.now())
+  const rateLimitUntilRef = useRef(0)
 
   const chatEligibleAppointments = useMemo(
     () => appointments.filter((item) => item.status === 'confirmed'),
@@ -57,6 +60,14 @@ export function DoctorDashboardPage () {
       unreadSnapshotRef.current = next
       return next
     })
+  }, [])
+
+  const enterRateLimitBackoff = useCallback((apiError) => {
+    if (apiError?.status !== 429) {
+      return false
+    }
+    rateLimitUntilRef.current = Math.max(rateLimitUntilRef.current, Date.now() + RATE_LIMIT_BACKOFF_MS)
+    return true
   }, [])
 
   const loadAppointments = async () => {
@@ -113,8 +124,11 @@ export function DoctorDashboardPage () {
     markConversationRead(selectedAppointmentId)
     appointmentsService.listMessages(selectedAppointmentId)
       .then((result) => setMessages(result))
-      .catch((apiError) => setError(apiError.message))
-  }, [selectedAppointmentId, selectedAppointment, markConversationRead])
+      .catch((apiError) => {
+        if (enterRateLimitBackoff(apiError)) return
+        setError(apiError.message)
+      })
+  }, [selectedAppointmentId, selectedAppointment, markConversationRead, enterRateLimitBackoff])
 
   useEffect(() => {
     if (!selectedAppointmentId || !selectedAppointment || selectedAppointment.status !== 'confirmed') {
@@ -124,6 +138,10 @@ export function DoctorDashboardPage () {
     let isCancelled = false
 
     const syncSelectedConversation = async () => {
+      if (Date.now() < rateLimitUntilRef.current) {
+        return
+      }
+
       try {
         const result = await appointmentsService.listMessages(selectedAppointmentId)
         if (isCancelled) return
@@ -146,7 +164,8 @@ export function DoctorDashboardPage () {
           }
           return result
         })
-      } catch (_apiError) {
+      } catch (apiError) {
+        enterRateLimitBackoff(apiError)
         // Best effort: avoid breaking chat UI if transient request fails.
       }
     }
@@ -154,13 +173,13 @@ export function DoctorDashboardPage () {
     syncSelectedConversation().catch(() => {})
     const intervalId = window.setInterval(() => {
       syncSelectedConversation().catch(() => {})
-    }, 3000)
+    }, 5000)
 
     return () => {
       isCancelled = true
       window.clearInterval(intervalId)
     }
-  }, [selectedAppointmentId, selectedAppointment, markConversationRead])
+  }, [selectedAppointmentId, selectedAppointment, markConversationRead, enterRateLimitBackoff])
 
   const primeMessageSnapshots = useCallback(async () => {
     if (monitoredAppointments.length === 0) {
@@ -178,7 +197,8 @@ export function DoctorDashboardPage () {
             appointmentId: appointment.id,
             latestKey: latest ? `${latest.id}:${latest.createdAt}` : ''
           }
-        } catch (_apiError) {
+        } catch (apiError) {
+          enterRateLimitBackoff(apiError)
           return {
             appointmentId: appointment.id,
             latestKey: undefined
@@ -194,7 +214,7 @@ export function DoctorDashboardPage () {
     })
     messageSnapshotRef.current = nextSnapshot
     pollCursorRef.current = 0
-  }, [monitoredAppointments])
+  }, [monitoredAppointments, enterRateLimitBackoff])
 
   useEffect(() => {
     primeMessageSnapshots().catch(() => {})
@@ -202,6 +222,9 @@ export function DoctorDashboardPage () {
 
   const checkIncomingMessages = useCallback(async () => {
     if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+      return
+    }
+    if (Date.now() < rateLimitUntilRef.current) {
       return
     }
 
@@ -229,7 +252,8 @@ export function DoctorDashboardPage () {
     try {
       const list = await appointmentsService.listMessages(appointment.id)
       latest = list[list.length - 1] || null
-    } catch (_apiError) {
+    } catch (apiError) {
+      enterRateLimitBackoff(apiError)
       return
     }
 
@@ -263,13 +287,13 @@ export function DoctorDashboardPage () {
     if (nextAlert) {
       setIncomingAlert(nextAlert)
     }
-  }, [monitoredAppointments, selectedAppointmentId])
+  }, [monitoredAppointments, selectedAppointmentId, enterRateLimitBackoff])
 
   useEffect(() => {
     checkIncomingMessages().catch(() => {})
     const intervalId = window.setInterval(() => {
       checkIncomingMessages().catch(() => {})
-    }, 3000)
+    }, 5000)
     return () => window.clearInterval(intervalId)
   }, [checkIncomingMessages])
 

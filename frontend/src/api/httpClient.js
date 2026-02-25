@@ -24,6 +24,7 @@ const refreshClient = axios.create({
 })
 
 let refreshPromise = null
+let patientReloginPromise = null
 
 const loadAuthState = () => {
   try {
@@ -61,7 +62,24 @@ const updateAuthWithRefresh = ({ accessToken, refreshToken, user }) => {
   saveAuthState(nextState)
 }
 
-const isAuthEndpoint = (url = '') => url.includes('/auth/login') || url.includes('/auth/refresh')
+const updateAuthWithPatientLogin = ({ token, patient }) => {
+  const stored = loadAuthState()
+  if (!stored) return
+  const nextState = {
+    ...stored,
+    token,
+    refreshToken: null,
+    user: null,
+    role: 'patient',
+    patient: patient ?? stored.patient
+  }
+  saveAuthState(nextState)
+}
+
+const isAuthEndpoint = (url = '') =>
+  url.includes('/auth/login') ||
+  url.includes('/auth/refresh') ||
+  url.includes('/patient/auth/login')
 
 const redirectToLogin = () => {
   if (typeof window !== 'undefined') {
@@ -100,6 +118,34 @@ httpClient.interceptors.response.use(
           originalRequest.headers.Authorization = `Bearer ${refreshed.accessToken}`
           return httpClient(originalRequest)
         } catch (_refreshError) {
+          clearAuthState()
+          redirectToLogin()
+        }
+      } else if (stored?.role === 'patient' && stored?.patient?.fullName && stored?.patient?.dni && stored?.patient?.phone) {
+        originalRequest._retry = true
+        try {
+          patientReloginPromise ??= refreshClient
+            .post('/patient/auth/login', {
+              fullName: stored.patient.fullName,
+              dni: stored.patient.dni,
+              phone: stored.patient.phone
+            })
+            .then((response) => {
+              if (!response?.data?.ok) {
+                throw new Error('invalid_patient_relogin_response')
+              }
+              return response.data.data
+            })
+            .finally(() => {
+              patientReloginPromise = null
+            })
+
+          const relogged = await patientReloginPromise
+          updateAuthWithPatientLogin(relogged)
+          originalRequest.headers = originalRequest.headers ?? {}
+          originalRequest.headers.Authorization = `Bearer ${relogged.token}`
+          return httpClient(originalRequest)
+        } catch (_patientReloginError) {
           clearAuthState()
           redirectToLogin()
         }

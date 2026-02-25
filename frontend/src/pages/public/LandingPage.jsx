@@ -1,10 +1,48 @@
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
-
-const specialties = ['Clinica General', 'Cardiologia', 'Pediatria', 'Dermatologia']
+import { specialtiesService } from '../../api/services'
 
 export function LandingPage () {
+  const [specialties, setSpecialties] = useState([])
+  const [specialtiesLoading, setSpecialtiesLoading] = useState(true)
+  const [specialtiesError, setSpecialtiesError] = useState('')
+
+  useEffect(() => {
+    let isCancelled = false
+
+    const loadSpecialties = async () => {
+      setSpecialtiesLoading(true)
+      setSpecialtiesError('')
+      try {
+        const result = await specialtiesService.list({
+          pageSize: 100,
+          isActive: 'true'
+        })
+        if (isCancelled) return
+        setSpecialties(result.items)
+      } catch (apiError) {
+        if (isCancelled) return
+        setSpecialtiesError(apiError.message || 'No se pudieron cargar las especialidades.')
+      } finally {
+        if (!isCancelled) {
+          setSpecialtiesLoading(false)
+        }
+      }
+    }
+
+    loadSpecialties().catch(() => {})
+    return () => {
+      isCancelled = true
+    }
+  }, [])
+
+  const featuredSpecialties = useMemo(
+    () => specialties.slice(0, 4),
+    [specialties]
+  )
+
   return (
     <div className='space-y-10'>
       <section className='glass-card overflow-hidden px-6 py-10 sm:px-10'>
@@ -37,12 +75,38 @@ export function LandingPage () {
 
       <section id='especialidades' className='space-y-4'>
         <h2 className='text-2xl font-semibold text-emerald-950'>Especialidades</h2>
-        <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
-          {specialties.map((name) => (
-            <Card key={name} className='p-4 text-center'>
-              <p className='text-sm font-semibold text-emerald-900'>{name}</p>
-            </Card>
-          ))}
+        {specialtiesLoading
+          ? (
+            <Card className='p-4 text-sm text-emerald-900/75'>Cargando especialidades...</Card>
+            )
+          : null}
+        {!specialtiesLoading && specialtiesError
+          ? (
+            <Card className='p-4 text-sm text-red-600'>{specialtiesError}</Card>
+            )
+          : null}
+        {!specialtiesLoading && !specialtiesError
+          ? (
+            <>
+              <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
+                {featuredSpecialties.map((specialty) => (
+                  <Link key={specialty.id} to={`/especialidades/${specialty.id}/profesionales`} className='block'>
+                    <Card className='p-4 text-center transition-transform duration-150 hover:-translate-y-0.5'>
+                      <p className='text-sm font-semibold text-emerald-900'>{specialty.name}</p>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+              {featuredSpecialties.length === 0
+                ? <Card className='p-4 text-sm text-emerald-900/75'>No hay especialidades activas.</Card>
+                : null}
+            </>
+            )
+          : null}
+        <div className='pt-1'>
+          <Link to='/especialidades' className='text-sm font-semibold text-brand-700 hover:text-brand-800'>
+            Ver todas -&gt;
+          </Link>
         </div>
       </section>
 

@@ -1,15 +1,20 @@
 import rateLimit from 'express-rate-limit'
 import { config } from '../config/env.js'
 
-const isMessagesReadRoute = (req) => {
-  if (req.method !== 'GET') return false
-  return /^\/api\/appointments\/[^/]+\/messages$/.test(req.path)
+const getRequestPath = (req) => {
+  const raw = req.originalUrl || req.url || req.path || ''
+  return raw.split('?')[0]
+}
+
+const isMessagesRoute = (req) => {
+  const path = getRequestPath(req)
+  return /^\/(?:api\/)?appointments\/[^/]+\/messages\/?$/.test(path)
 }
 
 export const globalLimiter = rateLimit({
   windowMs: config.RATE_LIMIT_WINDOW_MS,
   max: config.RATE_LIMIT_MAX,
-  skip: isMessagesReadRoute,
+  skip: isMessagesRoute,
   standardHeaders: true,
   legacyHeaders: false
 })
@@ -23,7 +28,7 @@ export const authLimiter = rateLimit({
 
 export const messagesLimiter = rateLimit({
   windowMs: config.RATE_LIMIT_WINDOW_MS,
-  max: Math.max(config.RATE_LIMIT_MAX, 600),
+  max: Math.max(config.RATE_LIMIT_MAX * 5, 1200),
   standardHeaders: true,
   legacyHeaders: false
 })
