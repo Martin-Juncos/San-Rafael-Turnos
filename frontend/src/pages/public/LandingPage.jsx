@@ -1,23 +1,33 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowRight,
+  Building2,
   CalendarCheck2,
   CircleDollarSign,
   Clock3,
   Facebook,
+  HelpCircle,
   Instagram,
+  Newspaper,
+  Linkedin,
   LogIn,
   Mail,
+  MapPinned,
   MapPin,
   MessageCircle,
   Phone,
-  Stethoscope
+  Stethoscope,
+  Twitter,
+  Users
 } from 'lucide-react'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
+import { FaqAccordion } from '../../components/public/FaqAccordion'
 import { NewsCard } from '../../components/public/NewsCard'
+import { ContactMap, clinicCoordinates } from '../../components/public/ContactMap'
 import { doctorsService, newsService, slotsService, specialtiesService } from '../../api/services'
+import { FAQ_ITEMS } from '../../data/faqs'
 
 const toLocalIsoDate = (date = new Date()) => {
   const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000))
@@ -272,7 +282,10 @@ export function LandingPage () {
       </section>
 
       <section id='sobre-nosotros' className='space-y-4'>
-        <h2 className='text-2xl font-semibold text-emerald-950'>Sobre nosotros</h2>
+        <h2 className='inline-flex items-center gap-2 text-2xl font-semibold text-emerald-950'>
+          <Building2 className='h-6 w-6 text-brand-700' />
+          Sobre nosotros
+        </h2>
         <Card className='overflow-hidden p-0'>
           <div className='grid gap-0 md:grid-cols-[0.85fr_1.15fr] md:items-stretch'>
             <div className='h-48 bg-emerald-100 md:h-full md:min-h-[230px]'>
@@ -308,7 +321,10 @@ export function LandingPage () {
       </section>
 
       <section id='especialidades' className='space-y-4'>
-        <h2 className='text-2xl font-semibold text-emerald-950'>Especialidades</h2>
+        <h2 className='inline-flex items-center gap-2 text-2xl font-semibold text-emerald-950'>
+          <Stethoscope className='h-6 w-6 text-brand-700' />
+          Especialidades
+        </h2>
         {specialtiesLoading
           ? (
             <Card className='p-4 text-sm text-emerald-900/75'>Cargando especialidades...</Card>
@@ -346,7 +362,10 @@ export function LandingPage () {
       </section>
 
       <section id='profesionales' className='space-y-4'>
-        <h2 className='text-2xl font-semibold text-emerald-950'>Profesionales</h2>
+        <h2 className='inline-flex items-center gap-2 text-2xl font-semibold text-emerald-950'>
+          <Users className='h-6 w-6 text-brand-700' />
+          Profesionales
+        </h2>
         {doctorsLoading
           ? (
             <Card className='p-4 text-sm text-emerald-900/75'>Cargando profesionales...</Card>
@@ -439,7 +458,10 @@ export function LandingPage () {
       </section>
 
       <section id='noticias' className='space-y-4'>
-        <h2 className='text-2xl font-semibold text-emerald-950'>Noticias</h2>
+        <h2 className='inline-flex items-center gap-2 text-2xl font-semibold text-emerald-950'>
+          <Newspaper className='h-6 w-6 text-brand-700' />
+          Noticias
+        </h2>
         {newsLoading
           ? <Card className='p-4 text-sm text-emerald-900/75'>Cargando noticias...</Card>
           : null}
@@ -468,42 +490,144 @@ export function LandingPage () {
         </div>
       </section>
 
-      <section id='contacto' className='grid gap-4 md:grid-cols-2'>
-        <Card>
-          <h3 className='text-lg font-semibold text-emerald-950'>Contacto</h3>
-          <div className='mt-3 space-y-2 text-sm text-emerald-900/80'>
-            <p className='flex items-start gap-2'>
-              <MapPin className='mt-0.5 h-4 w-4 text-brand-700' />
-              <span>Av. San Martin 1234, San Rafael, Mendoza</span>
-            </p>
-            <p className='flex items-center gap-2'>
-              <Phone className='h-4 w-4 text-brand-700' />
-              <span>+54 260 412-3456</span>
-            </p>
-            <p className='flex items-center gap-2'>
-              <Mail className='h-4 w-4 text-brand-700' />
-              <span>contacto@sanrafaelturnos.com</span>
-            </p>
-          </div>
+      <section id='preguntas-frecuentes' className='space-y-4'>
+        <h2 className='inline-flex items-center gap-2 text-2xl font-semibold text-emerald-950'>
+          <HelpCircle className='h-6 w-6 text-brand-700' />
+          Preguntas frecuentes
+        </h2>
+
+        <Card className='space-y-3'>
+          <FaqAccordion items={FAQ_ITEMS.slice(0, 4)} />
+          <Link
+            to='/preguntas-frecuentes'
+            className='flex items-center justify-between rounded-xl border border-emerald-200 bg-white/70 px-4 py-3 text-sm font-semibold text-emerald-950 transition hover:border-brand-300 hover:text-brand-700'
+          >
+            <span>Mas preguntas</span>
+            <ArrowRight className='h-4 w-4 text-brand-700' />
+          </Link>
         </Card>
-        <Card>
-          <h3 className='text-lg font-semibold text-emerald-950'>Redes</h3>
-          <div className='mt-2 flex flex-wrap gap-2 text-sm text-emerald-900/80'>
-            <span className='inline-flex items-center gap-1 rounded-lg bg-white/70 px-3 py-1'>
-              <Instagram className='h-4 w-4 text-brand-700' />
-              Instagram
-            </span>
-            <span className='inline-flex items-center gap-1 rounded-lg bg-white/70 px-3 py-1'>
-              <Facebook className='h-4 w-4 text-brand-700' />
-              Facebook
-            </span>
-            <span className='inline-flex items-center gap-1 rounded-lg bg-white/70 px-3 py-1'>
-              <MessageCircle className='h-4 w-4 text-brand-700' />
-              WhatsApp
-            </span>
+      </section>
+
+      <section id='contacto' className='space-y-4'>
+        <h2 className='inline-flex items-center gap-2 text-2xl font-semibold text-emerald-950'>
+          <MapPin className='h-6 w-6 text-brand-700' />
+          Contacto
+        </h2>
+        <Card className='overflow-hidden p-0'>
+          <div className='grid gap-0 lg:grid-cols-[1.05fr_1fr] lg:items-stretch'>
+            <div className='space-y-6 p-6 sm:p-8'>
+              <div className='space-y-4 text-emerald-900/85'>
+                <p className='flex items-start gap-3 text-lg leading-snug'>
+                  <MapPin className='mt-1 h-6 w-6 text-brand-700' />
+                  <span>Espana 930, Goya, Corrientes, Argentina</span>
+                </p>
+
+                <p className='flex items-center gap-3 text-lg'>
+                  <Phone className='h-6 w-6 text-brand-700' />
+                  <a href='tel:+5493777679100' className='hover:text-brand-700'>
+                    +54 9 3777 679100
+                  </a>
+                </p>
+
+                <p className='flex items-center gap-3 text-lg'>
+                  <Mail className='h-6 w-6 text-brand-700' />
+                  <a
+                    href='https://mail.google.com/mail/?view=cm&fs=1&to=prof.mcjuncos@gmail.com&su=Consulta%20-%20Clinica%20San%20Rafael%20Arcangel'
+                    target='_blank'
+                    rel='noreferrer'
+                    className='hover:text-brand-700'
+                  >
+                    prof.mcjuncos@gmail.com
+                  </a>
+                </p>
+
+                <p className='flex items-center gap-3 text-lg'>
+                  <MessageCircle className='h-6 w-6 text-brand-700' />
+                  <a href='https://wa.me/5493777679100' target='_blank' rel='noreferrer' className='hover:text-brand-700'>
+                    WhatsApp: +54 9 3777 679100
+                  </a>
+                </p>
+
+                <div className='flex items-start gap-3 text-lg'>
+                  <Clock3 className='mt-1 h-6 w-6 text-brand-700' />
+                  <div className='space-y-1'>
+                    <p className='font-semibold text-emerald-950'>Horario de atencion</p>
+                    <p className='text-base'>Lunes a Viernes: 9:00 - 18:00</p>
+                    <p className='text-base'>Sabados: 9:00 - 13:00</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className='border-t border-emerald-100/80 p-5 sm:p-6 lg:border-l lg:border-t-0 lg:border-emerald-100/80'>
+              <div className='overflow-hidden rounded-2xl'>
+                <ContactMap className='h-56 w-full sm:h-60' />
+              </div>
+              <a
+                href={`https://www.openstreetmap.org/?mlat=${clinicCoordinates.lat}&mlon=${clinicCoordinates.lon}#map=18/${clinicCoordinates.lat}/${clinicCoordinates.lon}`}
+                target='_blank'
+                rel='noreferrer'
+                className='mt-4 inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:text-brand-800'
+              >
+                <MapPinned className='h-4 w-4' />
+                Ver ubicacion en mapa
+              </a>
+            </div>
           </div>
         </Card>
       </section>
+
+      <footer className='glass-card space-y-6 p-6 sm:p-8'>
+        <div className='grid gap-6 md:grid-cols-3'>
+          <div className='space-y-2'>
+            <h3 className='text-lg font-semibold text-emerald-950'>Clinica San Rafael Arcangel</h3>
+            <p className='text-sm text-emerald-900/80'>
+              Salud de calidad con cercania, organizacion e innovacion.
+            </p>
+          </div>
+
+          <div className='space-y-2'>
+            <h4 className='text-sm font-semibold uppercase tracking-wide text-emerald-900/80'>Enlaces utiles</h4>
+            <div className='flex flex-col gap-1 text-sm'>
+              <Link to='/' className='hover:text-brand-700'>Inicio</Link>
+              <Link to='/sobre-nosotros' className='hover:text-brand-700'>Sobre nosotros</Link>
+              <Link to='/especialidades' className='hover:text-brand-700'>Especialidades</Link>
+              <Link to='/profesionales' className='hover:text-brand-700'>Profesionales</Link>
+              <Link to='/reservar' className='hover:text-brand-700'>Reservar turno</Link>
+              <Link to='/noticias' className='hover:text-brand-700'>Noticias</Link>
+              <Link to='/preguntas-frecuentes' className='hover:text-brand-700'>Preguntas frecuentes</Link>
+            </div>
+          </div>
+
+          <div className='space-y-2'>
+            <h4 className='text-sm font-semibold uppercase tracking-wide text-emerald-900/80'>Redes sociales</h4>
+            <div className='space-y-2'>
+              <a href='https://www.facebook.com' target='_blank' rel='noreferrer' className='inline-flex items-center gap-2 text-sm hover:text-brand-700'>
+                <Facebook className='h-4 w-4 text-brand-700' />
+                Facebook
+              </a>
+              <a href='https://www.instagram.com' target='_blank' rel='noreferrer' className='inline-flex items-center gap-2 text-sm hover:text-brand-700'>
+                <Instagram className='h-4 w-4 text-brand-700' />
+                Instagram
+              </a>
+              <a href='https://www.linkedin.com' target='_blank' rel='noreferrer' className='inline-flex items-center gap-2 text-sm hover:text-brand-700'>
+                <Linkedin className='h-4 w-4 text-brand-700' />
+                LinkedIn
+              </a>
+              <a href='https://x.com' target='_blank' rel='noreferrer' className='inline-flex items-center gap-2 text-sm hover:text-brand-700'>
+                <Twitter className='h-4 w-4 text-brand-700' />
+                Twitter / X
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <div className='h-px w-full bg-gradient-to-r from-transparent via-emerald-200 to-transparent' />
+        <p className='text-xs text-emerald-900/70'>
+          (c) {new Date().getFullYear()} Clinica San Rafael Arcangel. Todos los derechos reservados.
+        </p>
+      </footer>
     </div>
   )
 }
+
