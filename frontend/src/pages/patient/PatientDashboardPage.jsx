@@ -342,10 +342,22 @@ export function PatientDashboardPage () {
 
   return (
     <div className='space-y-6'>
-      <Card className='space-y-2'>
-        <h1 className='text-2xl font-semibold text-emerald-950'>Panel Paciente</h1>
-        <p className='text-sm text-emerald-900/80'>Mis turnos, comprobantes, cancelaciones y chat con el medico.</p>
-        <Link to='/reservar'><Button>Solicitar nuevo turno</Button></Link>
+      <Card>
+        <div className='grid gap-5 md:grid-cols-[1fr_auto] md:items-center'>
+          <div className='space-y-2'>
+            <h1 className='text-2xl font-semibold text-emerald-950 sm:text-3xl'>Panel Paciente</h1>
+            <p className='text-sm text-emerald-900/80 sm:text-base'>
+              Mis turnos, comprobantes, cancelaciones y chat con el medico.
+            </p>
+          </div>
+          <div className='flex items-center justify-center md:justify-end'>
+            <Link to='/reservar' className='w-full md:w-auto'>
+              <Button className='w-full px-8 py-4 text-lg font-semibold sm:px-10 sm:py-5 sm:text-xl'>
+                Solicitar nuevo turno
+              </Button>
+            </Link>
+          </div>
+        </div>
       </Card>
 
       {incomingAlert
