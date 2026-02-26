@@ -363,8 +363,20 @@ const applyPatchByRole = ({ role, body }) => {
   }
   if (role === 'doctor') {
     const allowed = {}
-    if (body.status && ['attended', 'no_show', 'cancelled'].includes(body.status)) {
+    if (body.date) {
+      allowed.date = body.date
+    }
+    if (body.startTime) {
+      allowed.startTime = body.startTime
+    }
+    if (body.slotMinutes) {
+      allowed.slotMinutes = body.slotMinutes
+    }
+    if (body.status) {
       allowed.status = body.status
+    }
+    if (typeof body.symptoms === 'string') {
+      allowed.symptoms = body.symptoms
     }
     if (typeof body.doctorNotes === 'string') {
       allowed.doctorNotes = body.doctorNotes

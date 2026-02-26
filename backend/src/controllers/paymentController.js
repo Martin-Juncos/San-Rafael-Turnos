@@ -53,6 +53,16 @@ export const paymentByAppointmentSchema = z.object({
   })
 })
 
+export const updatePaymentStatusSchema = z.object({
+  body: z.object({
+    status: z.enum(['pending', 'paid', 'failed', 'refunded'])
+  }),
+  query: z.object({}).optional(),
+  params: z.object({
+    appointmentId: z.string().uuid()
+  })
+})
+
 const ensurePaymentReadPermission = (auth, appointment) => {
   if (auth.role === 'admin' || auth.role === 'clinic') return
   if (auth.role === 'doctor' && auth.doctorId === appointment.doctorId) return
@@ -414,4 +424,86 @@ export const getPaymentByAppointment = async (req, res) => {
   }
   ensurePaymentReadPermission(req.auth, appointment)
   ok(res, appointment.payment)
+}
+
+export const updatePaymentStatusByAppointment = async (req, res) => {
+  if (!['admin', 'clinic', 'doctor'].includes(req.auth.role)) {
+    throw new AppError('Prohibido', 403, 'forbidden')
+  }
+
+  const appointment = await Appointment.findByPk(req.validated.params.appointmentId, {
+    include: [{ model: Payment, as: 'payment' }]
+  })
+
+  if (!appointment || !appointment.payment) {
+    throw new AppError('Pago no encontrado', 404, 'payment_not_found')
+  }
+
+  ensurePaymentReadPermission(req.auth, appointment)
+
+  const previousStatus = appointment.payment.status
+  const nextStatus = req.validated.body.status
+
+  if (previousStatus === nextStatus) {
+    ok(
+      res,
+      {
+        payment: appointment.payment,
+        appointmentStatus: appointment.status
+      },
+      'payment_status_unchanged'
+    )
+    return
+  }
+
+  await sequelize.transaction(async (transaction) => {
+    const paymentPatch = {
+      status: nextStatus
+    }
+
+    if (nextStatus === 'paid') {
+      paymentPatch.paidAt = new Date()
+      paymentPatch.externalRef = appointment.payment.externalRef || `manual_${appointment.id}`
+    } else if (nextStatus === 'pending' || nextStatus === 'failed') {
+      paymentPatch.paidAt = null
+    }
+
+    await appointment.payment.update(paymentPatch, { transaction })
+
+    if (nextStatus === 'paid' && ['requested', 'hold', 'rescheduled'].includes(appointment.status)) {
+      await appointment.update(
+        {
+          status: 'confirmed'
+        },
+        { transaction }
+      )
+    }
+
+    await writeAuditLog({
+      actorRole: req.auth.role,
+      actorId: req.auth.sub,
+      action: 'PAYMENT_STATUS_PATCHED',
+      entity: 'Payment',
+      entityId: appointment.payment.id,
+      meta: {
+        appointmentId: appointment.id,
+        previousStatus,
+        nextStatus
+      },
+      transaction
+    })
+  })
+
+  const refreshedAppointment = await Appointment.findByPk(appointment.id, {
+    include: [{ model: Payment, as: 'payment' }]
+  })
+
+  ok(
+    res,
+    {
+      payment: refreshedAppointment.payment,
+      appointmentStatus: refreshedAppointment.status
+    },
+    'payment_status_updated'
+  )
 }

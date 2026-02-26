@@ -9,10 +9,12 @@ import {
   syncMercadoPagoPayment,
   mercadoPagoWebhook,
   getPaymentByAppointment,
+  updatePaymentStatusByAppointment,
   confirmMockPaymentSchema,
   createMercadoPagoPreferenceSchema,
   syncMercadoPagoPaymentSchema,
-  paymentByAppointmentSchema
+  paymentByAppointmentSchema,
+  updatePaymentStatusSchema
 } from '../controllers/paymentController.js'
 
 const router = Router()
@@ -36,5 +38,12 @@ router.post(
   asyncHandler(syncMercadoPagoPayment)
 )
 router.get('/:appointmentId', authenticateJwt, validate(paymentByAppointmentSchema), asyncHandler(getPaymentByAppointment))
+router.patch(
+  '/:appointmentId/status',
+  authenticateJwt,
+  requireRoles('admin', 'clinic', 'doctor'),
+  validate(updatePaymentStatusSchema),
+  asyncHandler(updatePaymentStatusByAppointment)
+)
 
 export default router

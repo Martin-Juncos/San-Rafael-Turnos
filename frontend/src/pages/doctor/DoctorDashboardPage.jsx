@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { appointmentsService } from '../../api/services'
+import { appointmentsService, paymentsService } from '../../api/services'
 import { Card } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
@@ -17,11 +17,48 @@ const latestMessageKey = (list = []) => {
 
 const RATE_LIMIT_BACKOFF_MS = 30000
 
+const APPOINTMENT_STATUS_OPTIONS = [
+  { value: 'requested', label: 'Solicitado' },
+  { value: 'hold', label: 'Pendiente de pago' },
+  { value: 'confirmed', label: 'Confirmado' },
+  { value: 'cancelled', label: 'Cancelado' },
+  { value: 'rescheduled', label: 'Reprogramado' },
+  { value: 'attended', label: 'Atendido' },
+  { value: 'no_show', label: 'Ausente' }
+]
+
+const PAYMENT_STATUS_OPTIONS = [
+  { value: 'pending', label: 'Pendiente' },
+  { value: 'paid', label: 'Pagado' },
+  { value: 'failed', label: 'Fallido' },
+  { value: 'refunded', label: 'Reintegrado' }
+]
+
+const EMPTY_MANAGEMENT_FORM = {
+  date: '',
+  startTime: '',
+  status: '',
+  paymentStatus: '',
+  doctorNotes: ''
+}
+
+const buildManagementForm = (appointment) => {
+  if (!appointment) return EMPTY_MANAGEMENT_FORM
+  return {
+    date: appointment.date || '',
+    startTime: (appointment.startTime || '').slice(0, 5),
+    status: appointment.status || '',
+    paymentStatus: appointment.payment?.status || 'pending',
+    doctorNotes: appointment.doctorNotes || ''
+  }
+}
+
 export function DoctorDashboardPage () {
   const [appointments, setAppointments] = useState([])
   const [selectedAppointmentId, setSelectedAppointmentId] = useState('')
   const [messages, setMessages] = useState([])
-  const [noteDraft, setNoteDraft] = useState('')
+  const [managementForm, setManagementForm] = useState(EMPTY_MANAGEMENT_FORM)
+  const [savingManagement, setSavingManagement] = useState(false)
   const [chatDraft, setChatDraft] = useState('')
   const [incomingAlert, setIncomingAlert] = useState(null)
   const [unreadAppointmentIds, setUnreadAppointmentIds] = useState([])
@@ -53,6 +90,10 @@ export function DoctorDashboardPage () {
     () => appointments.find((item) => item.id === selectedAppointmentId) || null,
     [appointments, selectedAppointmentId]
   )
+
+  useEffect(() => {
+    setManagementForm(buildManagementForm(selectedAppointment))
+  }, [selectedAppointment])
 
   const markConversationRead = useCallback((appointmentId) => {
     setUnreadAppointmentIds((prev) => {
@@ -314,18 +355,53 @@ export function DoctorDashboardPage () {
     }
   }
 
-  const saveNotes = async () => {
-    if (!selectedAppointmentId) return
+  const saveManagement = async () => {
+    if (!selectedAppointmentId || !selectedAppointment) return
     setError('')
     setMessage('')
+    setSavingManagement(true)
+
+    const appointmentPatch = {}
+    const originalStartTime = (selectedAppointment.startTime || '').slice(0, 5)
+
+    if (managementForm.date && managementForm.date !== selectedAppointment.date) {
+      appointmentPatch.date = managementForm.date
+    }
+    if (managementForm.startTime && managementForm.startTime !== originalStartTime) {
+      appointmentPatch.startTime = managementForm.startTime
+    }
+    if (managementForm.status && managementForm.status !== selectedAppointment.status) {
+      appointmentPatch.status = managementForm.status
+    }
+    if (managementForm.doctorNotes !== (selectedAppointment.doctorNotes || '')) {
+      appointmentPatch.doctorNotes = managementForm.doctorNotes
+    }
+
+    const currentPaymentStatus = selectedAppointment.payment?.status || 'pending'
+    const paymentStatusChanged =
+      managementForm.paymentStatus &&
+      managementForm.paymentStatus !== currentPaymentStatus
+
+    if (Object.keys(appointmentPatch).length === 0 && !paymentStatusChanged) {
+      setMessage('No hay cambios para guardar en este turno.')
+      setSavingManagement(false)
+      return
+    }
+
     try {
-      await appointmentsService.update(selectedAppointmentId, {
-        doctorNotes: noteDraft
-      })
+      if (Object.keys(appointmentPatch).length > 0) {
+        await appointmentsService.update(selectedAppointmentId, appointmentPatch)
+      }
+      if (paymentStatusChanged) {
+        await paymentsService.updateStatus(selectedAppointmentId, managementForm.paymentStatus)
+      }
+
       await loadAppointments()
-      setMessage('La nota interna del turno fue guardada correctamente.')
+      setMessage('Los cambios del turno se guardaron correctamente.')
     } catch (apiError) {
       setError(apiError.message)
+    } finally {
+      setSavingManagement(false)
     }
   }
 
@@ -358,9 +434,7 @@ export function DoctorDashboardPage () {
                 variant='secondary'
                 className='px-3 py-1.5 text-xs'
                 onClick={() => {
-                  const selected = appointments.find((item) => item.id === incomingAlert.appointmentId)
                   setSelectedAppointmentId(incomingAlert.appointmentId)
-                  setNoteDraft(selected?.doctorNotes || '')
                   markConversationRead(incomingAlert.appointmentId)
                   setIncomingAlert(null)
                 }}
@@ -386,7 +460,9 @@ export function DoctorDashboardPage () {
                     <p className='font-semibold text-emerald-950'>
                       {appointment.date} {appointment.startTime.slice(0, 5)} - {appointment.patient?.fullName}
                     </p>
-                    <p className='text-xs text-emerald-900/75'>Estado: {appointment.status}</p>
+                    <p className='text-xs text-emerald-900/75'>
+                      Estado: {appointment.status} | Pago: {appointment.payment?.status || 'pending'}
+                    </p>
                     {unreadAppointmentIds.includes(appointment.id)
                       ? <p className='text-xs font-semibold text-amber-800'>Nuevo mensaje</p>
                       : null}
@@ -396,7 +472,6 @@ export function DoctorDashboardPage () {
                     className='rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xs'
                     onClick={() => {
                       setSelectedAppointmentId(appointment.id)
-                      setNoteDraft(appointment.doctorNotes || '')
                       markConversationRead(appointment.id)
                     }}
                   >
@@ -414,7 +489,7 @@ export function DoctorDashboardPage () {
         </Card>
 
         <Card className='space-y-4'>
-          <h2 className='text-lg font-semibold text-emerald-950'>Detalle y notas</h2>
+          <h2 className='text-lg font-semibold text-emerald-950'>Gestion del turno</h2>
           <label className='space-y-1 block'>
             <span className='text-xs text-emerald-900/75'>Turno seleccionado</span>
             <select
@@ -423,13 +498,11 @@ export function DoctorDashboardPage () {
               onChange={(event) => {
                 const nextId = event.target.value
                 setSelectedAppointmentId(nextId)
-                const selected = appointments.find((item) => item.id === nextId)
-                setNoteDraft(selected?.doctorNotes || '')
                 markConversationRead(nextId)
               }}
             >
               <option value=''>Seleccionar</option>
-              {chatEligibleAppointments.map((appointment) => (
+              {appointments.map((appointment) => (
                 <option key={appointment.id} value={appointment.id}>
                   {appointment.date} {appointment.startTime.slice(0, 5)} - {appointment.patient?.fullName}
                   {unreadAppointmentIds.includes(appointment.id) ? ' (Nuevo mensaje)' : ''}
@@ -437,12 +510,69 @@ export function DoctorDashboardPage () {
               ))}
             </select>
           </label>
-          <Input
-            label='Nota interna'
-            value={noteDraft}
-            onChange={(event) => setNoteDraft(event.target.value)}
-          />
-          <Button onClick={saveNotes}>Guardar nota</Button>
+
+          {selectedAppointment
+            ? (
+              <div className='space-y-3 rounded-xl border border-emerald-200 bg-white/70 p-3'>
+                <div className='grid gap-3 sm:grid-cols-2'>
+                  <Input
+                    label='Fecha'
+                    type='date'
+                    value={managementForm.date}
+                    onChange={(event) => setManagementForm((prev) => ({ ...prev, date: event.target.value }))}
+                  />
+                  <Input
+                    label='Hora'
+                    type='time'
+                    value={managementForm.startTime}
+                    onChange={(event) => setManagementForm((prev) => ({ ...prev, startTime: event.target.value }))}
+                  />
+                </div>
+
+                <div className='grid gap-3 sm:grid-cols-2'>
+                  <label className='space-y-1 block'>
+                    <span className='text-xs text-emerald-900/75'>Estado del turno</span>
+                    <select
+                      className='glass-input'
+                      value={managementForm.status}
+                      onChange={(event) => setManagementForm((prev) => ({ ...prev, status: event.target.value }))}
+                    >
+                      {APPOINTMENT_STATUS_OPTIONS.map((item) => (
+                        <option key={item.value} value={item.value}>{item.label}</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className='space-y-1 block'>
+                    <span className='text-xs text-emerald-900/75'>Estado del pago</span>
+                    <select
+                      className='glass-input'
+                      value={managementForm.paymentStatus}
+                      onChange={(event) => setManagementForm((prev) => ({ ...prev, paymentStatus: event.target.value }))}
+                    >
+                      {PAYMENT_STATUS_OPTIONS.map((item) => (
+                        <option key={item.value} value={item.value}>{item.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <Input
+                  label='Nota interna'
+                  value={managementForm.doctorNotes}
+                  onChange={(event) => setManagementForm((prev) => ({ ...prev, doctorNotes: event.target.value }))}
+                />
+
+                <Button onClick={saveManagement} disabled={savingManagement}>
+                  {savingManagement ? 'Guardando cambios...' : 'Guardar gestion'}
+                </Button>
+              </div>
+              )
+            : (
+              <p className='text-sm text-emerald-900/75'>
+                Selecciona un turno para editar fecha, hora, estado, pago y nota interna.
+              </p>
+              )}
 
           <div className='space-y-2 rounded-xl border border-emerald-200 bg-white/70 p-3'>
             <h3 className='text-sm font-semibold text-emerald-950'>Mensajeria del turno</h3>
