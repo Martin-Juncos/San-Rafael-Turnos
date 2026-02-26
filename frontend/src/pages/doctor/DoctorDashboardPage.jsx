@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { appointmentsService, paymentsService } from '../../api/services'
+import { appointmentsService, doctorsService, paymentsService } from '../../api/services'
 import { Card } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
 import { ActionResultModal } from '../../components/ui/ActionResultModal'
+import { useAppSelector } from '../../app/hooks'
+import { selectAuth } from '../../features/auth/authSlice'
 
 const sameArray = (left, right) => {
   if (left.length !== right.length) return false
@@ -56,9 +58,11 @@ const buildManagementForm = (appointment) => {
 
 export function DoctorDashboardPage () {
   const navigate = useNavigate()
+  const auth = useAppSelector(selectAuth)
   const [appointments, setAppointments] = useState([])
   const [selectedAppointmentId, setSelectedAppointmentId] = useState('')
   const [selectedPrintDate, setSelectedPrintDate] = useState('')
+  const [doctorSpecialtyId, setDoctorSpecialtyId] = useState('')
   const [messages, setMessages] = useState([])
   const [managementForm, setManagementForm] = useState(EMPTY_MANAGEMENT_FORM)
   const [savingManagement, setSavingManagement] = useState(false)
@@ -113,6 +117,30 @@ export function DoctorDashboardPage () {
       return printableDates[0] || ''
     })
   }, [printableDates])
+
+  useEffect(() => {
+    if (auth.role !== 'doctor' || !auth.user?.doctorId) {
+      setDoctorSpecialtyId('')
+      return
+    }
+
+    let isCancelled = false
+
+    const loadDoctorProfile = async () => {
+      try {
+        const doctor = await doctorsService.getById(auth.user.doctorId)
+        if (isCancelled) return
+        setDoctorSpecialtyId(doctor.specialtyId || '')
+      } catch (_apiError) {
+        if (!isCancelled) setDoctorSpecialtyId('')
+      }
+    }
+
+    loadDoctorProfile().catch(() => {})
+    return () => {
+      isCancelled = true
+    }
+  }, [auth.role, auth.user?.doctorId])
 
   const markConversationRead = useCallback((appointmentId) => {
     setUnreadAppointmentIds((prev) => {
@@ -430,6 +458,19 @@ export function DoctorDashboardPage () {
     navigate(url)
   }
 
+  const openReserveWithPrefill = () => {
+    const doctorId = auth.user?.doctorId
+    if (!doctorId) return
+
+    const params = new URLSearchParams()
+    params.set('doctorId', doctorId)
+    if (doctorSpecialtyId) {
+      params.set('specialtyId', doctorSpecialtyId)
+    }
+
+    navigate(`/reservar?${params.toString()}`)
+  }
+
   const sendMessage = async (event) => {
     event.preventDefault()
     if (!selectedAppointmentId || !chatDraft.trim()) return
@@ -444,9 +485,24 @@ export function DoctorDashboardPage () {
 
   return (
     <div className='space-y-6'>
-      <Card className='space-y-1'>
-        <h1 className='text-2xl font-semibold text-emerald-950'>Panel Medico</h1>
-        <p className='text-sm text-emerald-900/80'>Agenda diaria/semanal, estado de atencion y mensajeria por turno confirmado.</p>
+      <Card>
+        <div className='grid gap-4 md:grid-cols-[1fr_auto] md:items-center'>
+          <div className='space-y-1'>
+            <h1 className='text-2xl font-semibold text-emerald-950'>Panel Medico</h1>
+            <p className='text-sm text-emerald-900/80'>
+              Agenda diaria/semanal, estado de atencion y mensajeria por turno confirmado.
+            </p>
+          </div>
+          <div className='flex justify-start md:justify-end'>
+            <Button
+              onClick={openReserveWithPrefill}
+              disabled={!auth.user?.doctorId}
+              className='px-6 py-3 text-base'
+            >
+              Cargar turno para este medico
+            </Button>
+          </div>
+        </div>
       </Card>
 
       {incomingAlert

@@ -147,7 +147,7 @@ export const createAppointment = async (req, res) => {
   const actorRole = req.auth.role
   const actorId = req.auth.sub
 
-  if (!['patient', 'clinic', 'admin'].includes(actorRole)) {
+  if (!['patient', 'clinic', 'admin', 'doctor'].includes(actorRole)) {
     throw new AppError('Prohibido', 403, 'forbidden')
   }
 

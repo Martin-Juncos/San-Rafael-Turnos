@@ -105,6 +105,31 @@ export function ReservePage () {
   }, [])
 
   useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const prefillDoctorId = params.get('doctorId') || ''
+    const prefillSpecialtyId = params.get('specialtyId') || ''
+    if (!prefillDoctorId && !prefillSpecialtyId) return
+
+    setForm((prev) => {
+      const next = { ...prev }
+      let changed = false
+
+      if (prefillSpecialtyId && prefillSpecialtyId !== prev.specialtyId) {
+        next.specialtyId = prefillSpecialtyId
+        changed = true
+      }
+      if (prefillDoctorId && prefillDoctorId !== prev.doctorId) {
+        next.doctorId = prefillDoctorId
+        changed = true
+      }
+      if (changed) {
+        next.startTime = ''
+      }
+      return changed ? next : prev
+    })
+  }, [location.search])
+
+  useEffect(() => {
     if (!success) return
     setFeedbackModal({
       open: true,
@@ -318,8 +343,8 @@ export function ReservePage () {
   const createHold = async () => {
     setError('')
     setSuccess('')
-    if (auth.role !== 'patient') {
-      setError('Para reservar debes ingresar como paciente.')
+    if (!['patient', 'clinic', 'admin', 'doctor'].includes(auth.role)) {
+      setError('Debes iniciar sesion para cargar un turno.')
       return
     }
     try {
