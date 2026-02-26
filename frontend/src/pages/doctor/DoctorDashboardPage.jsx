@@ -194,11 +194,11 @@ export function DoctorDashboardPage () {
   }
 
   useEffect(() => {
-    if (selectedAppointmentId && !chatEligibleAppointments.some((item) => item.id === selectedAppointmentId)) {
+    if (selectedAppointmentId && !appointments.some((item) => item.id === selectedAppointmentId)) {
       setSelectedAppointmentId('')
       setMessages([])
     }
-  }, [chatEligibleAppointments, selectedAppointmentId])
+  }, [appointments, selectedAppointmentId])
 
   useEffect(() => {
     if (!selectedAppointmentId) {
