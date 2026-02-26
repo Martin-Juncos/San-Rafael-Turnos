@@ -14,6 +14,7 @@ import { LoginPage } from './pages/public/LoginPage'
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage'
 import { ClinicDashboardPage } from './pages/clinic/ClinicDashboardPage'
 import { DoctorDashboardPage } from './pages/doctor/DoctorDashboardPage'
+import { DoctorPrintDayPage } from './pages/doctor/DoctorPrintDayPage'
 import { PatientDashboardPage } from './pages/patient/PatientDashboardPage'
 import { ReservePage } from './pages/patient/ReservePage'
 import { NotFoundPage } from './pages/public/NotFoundPage'
@@ -22,7 +23,7 @@ function App () {
   return (
     <div className='flex min-h-screen flex-col'>
       <AppHeader />
-      <main className='mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8'>
+      <main className='mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8 print:max-w-none print:px-0 print:py-0'>
         <Routes>
           <Route path='/' element={<LandingPage />} />
           <Route path='/especialidades' element={<SpecialtiesPage />} />
@@ -63,6 +64,14 @@ function App () {
             element={
               <ProtectedRoute allowedRoles={['doctor']}>
                 <DoctorDashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path='/dashboard/medico/imprimir'
+            element={
+              <ProtectedRoute allowedRoles={['doctor']}>
+                <DoctorPrintDayPage />
               </ProtectedRoute>
             }
           />

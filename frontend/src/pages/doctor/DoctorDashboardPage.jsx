@@ -56,6 +56,7 @@ const buildManagementForm = (appointment) => {
 export function DoctorDashboardPage () {
   const [appointments, setAppointments] = useState([])
   const [selectedAppointmentId, setSelectedAppointmentId] = useState('')
+  const [selectedPrintDate, setSelectedPrintDate] = useState('')
   const [messages, setMessages] = useState([])
   const [managementForm, setManagementForm] = useState(EMPTY_MANAGEMENT_FORM)
   const [savingManagement, setSavingManagement] = useState(false)
@@ -91,9 +92,25 @@ export function DoctorDashboardPage () {
     [appointments, selectedAppointmentId]
   )
 
+  const printableDates = useMemo(() => {
+    const values = appointments
+      .map((item) => item.date)
+      .filter(Boolean)
+    return Array.from(new Set(values)).sort((left, right) => left.localeCompare(right))
+  }, [appointments])
+
   useEffect(() => {
     setManagementForm(buildManagementForm(selectedAppointment))
   }, [selectedAppointment])
+
+  useEffect(() => {
+    setSelectedPrintDate((previous) => {
+      if (previous && printableDates.includes(previous)) {
+        return previous
+      }
+      return printableDates[0] || ''
+    })
+  }, [printableDates])
 
   const markConversationRead = useCallback((appointmentId) => {
     setUnreadAppointmentIds((prev) => {
@@ -405,6 +422,12 @@ export function DoctorDashboardPage () {
     }
   }
 
+  const openPrintDayView = () => {
+    if (!selectedPrintDate) return
+    const url = `/dashboard/medico/imprimir?date=${encodeURIComponent(selectedPrintDate)}`
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
   const sendMessage = async (event) => {
     event.preventDefault()
     if (!selectedAppointmentId || !chatDraft.trim()) return
@@ -452,6 +475,29 @@ export function DoctorDashboardPage () {
       <div className='grid gap-6 xl:grid-cols-[1.2fr_1fr]'>
         <Card className='space-y-3'>
           <h2 className='text-lg font-semibold text-emerald-950'>Mis turnos</h2>
+          <div className='flex flex-wrap items-end justify-between gap-3 rounded-xl border border-emerald-200 bg-white/70 p-3'>
+            <label className='space-y-1 text-sm'>
+              <span className='text-xs text-emerald-900/75'>Fecha para imprimir</span>
+              <select
+                className='glass-input min-w-[220px]'
+                value={selectedPrintDate}
+                onChange={(event) => setSelectedPrintDate(event.target.value)}
+              >
+                {printableDates.length === 0
+                  ? <option value=''>Sin fechas con turnos</option>
+                  : printableDates.map((date) => (
+                      <option key={date} value={date}>{date}</option>
+                    ))}
+              </select>
+            </label>
+            <Button
+              variant='secondary'
+              onClick={openPrintDayView}
+              disabled={!selectedPrintDate}
+            >
+              Imprimir pacientes del dia
+            </Button>
+          </div>
           <div className='space-y-2'>
             {appointments.map((appointment) => (
               <div key={appointment.id} className='rounded-xl bg-white/70 p-3 text-sm'>

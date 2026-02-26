@@ -46,7 +46,7 @@ export function AppHeader () {
   }, [location.pathname])
 
   return (
-    <header className='sticky top-0 z-40 border-b border-emerald-200/70 bg-white/45 backdrop-blur-xl'>
+    <header className='sticky top-0 z-40 border-b border-emerald-200/70 bg-white/45 backdrop-blur-xl print:hidden'>
       <div className='mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8'>
         <Link to='/' className='group flex items-center gap-3' aria-label='Ir al inicio'>
           <div className='h-14 w-14 overflow-hidden rounded-xl bg-white/75 shadow-sm ring-1 ring-emerald-200 transition group-hover:scale-[1.02] sm:h-16 sm:w-16'>

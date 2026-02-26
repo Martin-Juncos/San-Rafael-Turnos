@@ -3,7 +3,7 @@ import { SiFacebook, SiInstagram, SiLinkedin, SiX } from 'react-icons/si'
 
 export function AppFooter () {
   return (
-    <footer className='border-t border-emerald-200/70 bg-white/45 backdrop-blur-xl'>
+    <footer className='border-t border-emerald-200/70 bg-white/45 backdrop-blur-xl print:hidden'>
       <div className='mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8'>
         <div className='grid grid-cols-2 gap-x-6 gap-y-8 lg:grid-cols-[1fr_auto_1fr] lg:items-start'>
           <div className='order-2 space-y-3 lg:order-1'>
