@@ -37,6 +37,23 @@ const PAYMENT_STATUS_OPTIONS = [
   { value: 'refunded', label: 'Reintegrado' }
 ]
 
+const APPOINTMENT_STATUS_LABELS = {
+  requested: 'Solicitado',
+  hold: 'Pendiente de pago',
+  confirmed: 'Confirmado',
+  cancelled: 'Cancelado',
+  rescheduled: 'Reprogramado',
+  attended: 'Atendido',
+  no_show: 'Ausente'
+}
+
+const PAYMENT_STATUS_LABELS = {
+  pending: 'Pendiente',
+  paid: 'Pagado',
+  failed: 'Fallido',
+  refunded: 'Reintegrado'
+}
+
 const EMPTY_MANAGEMENT_FORM = {
   date: '',
   startTime: '',
@@ -388,15 +405,18 @@ export function DoctorDashboardPage () {
   const updateStatus = async (appointmentId, status) => {
     setError('')
     setMessage('')
+    const currentAppointment = appointments.find((item) => item.id === appointmentId)
+    const label = APPOINTMENT_STATUS_LABELS[status] || status
+
+    if (currentAppointment?.status === status) {
+      setMessage(`El turno ya esta marcado como "${label}".`)
+      return
+    }
+
     try {
       await appointmentsService.update(appointmentId, { status })
       await loadAppointments()
-      const labels = {
-        attended: 'atendido',
-        no_show: 'ausente',
-        cancelled: 'cancelado'
-      }
-      setMessage(`El turno fue actualizado a estado "${labels[status] || status}".`)
+      setMessage(`El turno fue actualizado a estado "${label}".`)
     } catch (apiError) {
       setError(apiError.message)
     }
@@ -565,7 +585,9 @@ export function DoctorDashboardPage () {
                       {appointment.date} {appointment.startTime.slice(0, 5)} - {appointment.patient?.fullName}
                     </p>
                     <p className='text-xs text-emerald-900/75'>
-                      Estado: {appointment.status} | Pago: {appointment.payment?.status || 'pending'}
+                      Estado: {APPOINTMENT_STATUS_LABELS[appointment.status] || appointment.status}
+                      {' '}|{' '}
+                      Pago: {PAYMENT_STATUS_LABELS[appointment.payment?.status] || appointment.payment?.status || 'Pendiente'}
                     </p>
                     {unreadAppointmentIds.includes(appointment.id)
                       ? <p className='text-xs font-semibold text-amber-800'>Nuevo mensaje</p>
@@ -583,8 +605,28 @@ export function DoctorDashboardPage () {
                   </button>
                 </div>
                 <div className='mt-2 flex flex-wrap gap-2'>
-                  <Button className='px-3 py-1.5 text-xs' onClick={() => updateStatus(appointment.id, 'attended')}>Atendido</Button>
-                  <Button variant='secondary' className='px-3 py-1.5 text-xs' onClick={() => updateStatus(appointment.id, 'no_show')}>Ausente</Button>
+                  <Button
+                    variant='secondary'
+                    className={`px-3 py-1.5 text-xs ${
+                      appointment.status === 'attended'
+                        ? 'border border-brand-700 bg-brand-700 text-white hover:bg-brand-800'
+                        : 'border border-emerald-200 bg-emerald-100 text-emerald-900 hover:bg-emerald-200'
+                    }`}
+                    onClick={() => updateStatus(appointment.id, 'attended')}
+                  >
+                    Atendido
+                  </Button>
+                  <Button
+                    variant='secondary'
+                    className={`px-3 py-1.5 text-xs ${
+                      appointment.status === 'no_show'
+                        ? 'border border-brand-700 bg-brand-700 text-white hover:bg-brand-800'
+                        : 'border border-emerald-200 bg-emerald-100 text-emerald-900 hover:bg-emerald-200'
+                    }`}
+                    onClick={() => updateStatus(appointment.id, 'no_show')}
+                  >
+                    Ausente
+                  </Button>
                 </div>
               </div>
             ))}
