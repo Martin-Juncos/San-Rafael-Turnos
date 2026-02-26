@@ -33,7 +33,14 @@ function App () {
           <Route path='/sobre-nosotros' element={<AboutPage />} />
           <Route path='/preguntas-frecuentes' element={<FaqPage />} />
           <Route path='/ingresar' element={<LoginPage />} />
-          <Route path='/reservar' element={<ReservePage />} />
+          <Route
+            path='/reservar'
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'clinic', 'doctor', 'patient']}>
+                <ReservePage />
+              </ProtectedRoute>
+            }
+          />
 
           <Route
             path='/dashboard/admin'
