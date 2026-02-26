@@ -422,6 +422,26 @@ export function DoctorDashboardPage () {
     }
   }
 
+  const markPaymentAsPaid = async (appointmentId) => {
+    setError('')
+    setMessage('')
+    const currentAppointment = appointments.find((item) => item.id === appointmentId)
+    const currentStatus = currentAppointment?.payment?.status || 'pending'
+
+    if (currentStatus === 'paid') {
+      setMessage('El pago de este turno ya esta marcado como "Pagado".')
+      return
+    }
+
+    try {
+      await paymentsService.updateStatus(appointmentId, 'paid')
+      await loadAppointments()
+      setMessage('El pago del turno fue actualizado a "Pagado".')
+    } catch (apiError) {
+      setError(apiError.message)
+    }
+  }
+
   const saveManagement = async () => {
     if (!selectedAppointmentId || !selectedAppointment) return
     setError('')
@@ -626,6 +646,17 @@ export function DoctorDashboardPage () {
                     onClick={() => updateStatus(appointment.id, 'no_show')}
                   >
                     Ausente
+                  </Button>
+                  <Button
+                    variant='secondary'
+                    className={`px-3 py-1.5 text-xs ${
+                      appointment.payment?.status === 'paid'
+                        ? 'border border-emerald-200 bg-emerald-100 text-emerald-900 hover:bg-emerald-200'
+                        : 'border border-brand-700 bg-brand-700 text-white hover:bg-brand-800'
+                    }`}
+                    onClick={() => markPaymentAsPaid(appointment.id)}
+                  >
+                    {appointment.payment?.status === 'paid' ? 'Pagado' : 'Pagar'}
                   </Button>
                 </div>
               </div>
