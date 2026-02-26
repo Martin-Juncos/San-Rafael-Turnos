@@ -23,6 +23,14 @@ export const initPatientModel = (sequelize) => {
         type: DataTypes.STRING,
         allowNull: false
       },
+      streetAndNumber: {
+        type: DataTypes.STRING,
+        allowNull: true
+      },
+      city: {
+        type: DataTypes.STRING,
+        allowNull: true
+      },
       birthDate: {
         type: DataTypes.DATEONLY,
         allowNull: true

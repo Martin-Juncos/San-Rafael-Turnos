@@ -128,7 +128,9 @@ httpClient.interceptors.response.use(
             .post('/patient/auth/login', {
               fullName: stored.patient.fullName,
               dni: stored.patient.dni,
-              phone: stored.patient.phone
+              phone: stored.patient.phone,
+              streetAndNumber: stored.patient.streetAndNumber || undefined,
+              city: stored.patient.city || undefined
             })
             .then((response) => {
               if (!response?.data?.ok) {
