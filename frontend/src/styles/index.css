@@ -60,3 +60,16 @@ body {
 .leaflet-container {
   z-index: 0;
 }
+
+@page {
+  size: A4 portrait;
+  margin: 12mm;
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

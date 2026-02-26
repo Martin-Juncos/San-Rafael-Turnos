@@ -83,7 +83,7 @@ export function DoctorPrintDayPage () {
   }, [appointments])
 
   return (
-    <div className='space-y-4 print:space-y-2'>
+    <div className='space-y-5 print:space-y-3'>
       <div className='flex flex-wrap items-center justify-between gap-2 print:hidden'>
         <Link to='/dashboard/medico'>
           <Button variant='secondary'>Volver al panel</Button>
@@ -91,17 +91,26 @@ export function DoctorPrintDayPage () {
         <Button onClick={() => window.print()}>Imprimir</Button>
       </div>
 
-      <Card className='space-y-4 print:rounded-none print:border-0 print:bg-white print:p-0 print:shadow-none'>
-        <div className='space-y-1'>
-          <h1 className='text-2xl font-semibold text-emerald-950 print:text-xl'>
+      <Card className='space-y-5 print:rounded-none print:border-0 print:bg-white print:p-0 print:shadow-none'>
+        <div className='rounded-2xl border border-emerald-200/80 bg-white/70 p-5 shadow-sm print:rounded-none print:border-0 print:bg-white print:px-0 print:py-2 print:shadow-none'>
+          <p className='text-center text-3xl font-bold tracking-tight text-emerald-950 print:text-4xl'>
+            Clinica San Rafael Arcangel
+          </p>
+          <div className='mx-auto mt-3 h-px w-full max-w-3xl bg-gradient-to-r from-transparent via-emerald-300 to-transparent print:bg-emerald-300' />
+          <h1 className='mt-4 text-center text-2xl font-semibold text-emerald-950 print:text-2xl'>
             Listado de pacientes del dia
           </h1>
-          <p className='text-sm text-emerald-900/80'>
-            Profesional: <span className='font-semibold text-emerald-950'>{doctorName}</span>
-          </p>
-          <p className='text-sm text-emerald-900/80'>
-            Fecha: <span className='font-semibold text-emerald-950'>{formatLongDate(selectedDate)}</span>
-          </p>
+          <div className='mt-4 grid gap-1'>
+            <p className='flex items-baseline gap-2 text-sm text-emerald-900/85 print:text-xs'>
+              <span>Profesional:</span>
+              <span className='text-2xl font-semibold leading-tight text-emerald-950 print:text-2xl'>
+                {doctorName}
+              </span>
+            </p>
+            <p className='pt-1 text-sm text-emerald-900/85 print:text-xs'>
+              Fecha: <span className='font-semibold text-emerald-950'>{formatLongDate(selectedDate)}</span>
+            </p>
+          </div>
         </div>
 
         {loading
@@ -117,30 +126,35 @@ export function DoctorPrintDayPage () {
         {!loading && !error && appointments.length > 0
           ? (
             <div className='overflow-x-auto rounded-xl border border-emerald-200 print:rounded-none print:border-emerald-300'>
-              <table className='min-w-full text-left text-sm'>
+              <table className='min-w-full text-left text-sm print:text-[11px]'>
                 <thead className='bg-emerald-50 print:bg-white'>
                   <tr>
-                    <th className='px-3 py-2 font-semibold text-emerald-950'>Hora</th>
-                    <th className='px-3 py-2 font-semibold text-emerald-950'>Paciente</th>
-                    <th className='px-3 py-2 font-semibold text-emerald-950'>DNI</th>
-                    <th className='px-3 py-2 font-semibold text-emerald-950'>Telefono</th>
-                    <th className='px-3 py-2 font-semibold text-emerald-950'>Estado</th>
-                    <th className='px-3 py-2 font-semibold text-emerald-950'>Pago</th>
+                    <th className='whitespace-nowrap px-3 py-2 font-semibold uppercase tracking-wide text-emerald-950'>Hora</th>
+                    <th className='whitespace-nowrap px-3 py-2 font-semibold uppercase tracking-wide text-emerald-950'>Paciente</th>
+                    <th className='whitespace-nowrap px-3 py-2 font-semibold uppercase tracking-wide text-emerald-950'>DNI</th>
+                    <th className='whitespace-nowrap px-3 py-2 font-semibold uppercase tracking-wide text-emerald-950'>Telefono</th>
+                    <th className='whitespace-nowrap px-3 py-2 font-semibold uppercase tracking-wide text-emerald-950'>Estado</th>
+                    <th className='whitespace-nowrap px-3 py-2 font-semibold uppercase tracking-wide text-emerald-950'>Pago</th>
+                    <th className='w-[40%] px-3 py-2 font-semibold uppercase tracking-wide text-emerald-950'>Sintomas / motivo</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {appointments.map((appointment) => (
-                    <tr key={appointment.id} className='border-t border-emerald-100 print:border-emerald-300'>
-                      <td className='px-3 py-2'>{appointment.startTime?.slice(0, 5) || '-'}</td>
-                      <td className='px-3 py-2'>{appointment.patient?.fullName || '-'}</td>
-                      <td className='px-3 py-2'>{appointment.patient?.dni || '-'}</td>
-                      <td className='px-3 py-2'>{appointment.patient?.phone || '-'}</td>
-                      <td className='px-3 py-2'>
+                  {appointments.map((appointment, index) => (
+                    <tr
+                      key={appointment.id}
+                      className={`border-t border-emerald-100 print:border-emerald-300 ${index % 2 === 0 ? 'bg-white/60' : 'bg-emerald-50/30 print:bg-white'}`}
+                    >
+                      <td className='whitespace-nowrap px-3 py-2'>{appointment.startTime?.slice(0, 5) || '-'}</td>
+                      <td className='whitespace-nowrap px-3 py-2'>{appointment.patient?.fullName || '-'}</td>
+                      <td className='whitespace-nowrap px-3 py-2'>{appointment.patient?.dni || '-'}</td>
+                      <td className='whitespace-nowrap px-3 py-2'>{appointment.patient?.phone || '-'}</td>
+                      <td className='whitespace-nowrap px-3 py-2'>
                         {appointmentStatusLabels[appointment.status] || appointment.status}
                       </td>
-                      <td className='px-3 py-2'>
+                      <td className='whitespace-nowrap px-3 py-2'>
                         {paymentStatusLabels[appointment.payment?.status] || appointment.payment?.status || '-'}
                       </td>
+                      <td className='px-3 py-2 align-top whitespace-normal break-words'>{appointment.symptoms || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -148,6 +162,10 @@ export function DoctorPrintDayPage () {
             </div>
             )
           : null}
+
+        <p className='text-right text-xs text-emerald-900/70 print:text-[10px]'>
+          Emitido: {new Date().toLocaleString('es-AR')}
+        </p>
       </Card>
     </div>
   )

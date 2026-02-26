@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { appointmentsService, paymentsService } from '../../api/services'
 import { Card } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
@@ -54,6 +55,7 @@ const buildManagementForm = (appointment) => {
 }
 
 export function DoctorDashboardPage () {
+  const navigate = useNavigate()
   const [appointments, setAppointments] = useState([])
   const [selectedAppointmentId, setSelectedAppointmentId] = useState('')
   const [selectedPrintDate, setSelectedPrintDate] = useState('')
@@ -425,7 +427,7 @@ export function DoctorDashboardPage () {
   const openPrintDayView = () => {
     if (!selectedPrintDate) return
     const url = `/dashboard/medico/imprimir?date=${encodeURIComponent(selectedPrintDate)}`
-    window.open(url, '_blank', 'noopener,noreferrer')
+    navigate(url)
   }
 
   const sendMessage = async (event) => {
