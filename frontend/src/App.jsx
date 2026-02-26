@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppHeader } from './components/layout/AppHeader'
+import { AppFooter } from './components/layout/AppFooter'
 import { ProtectedRoute } from './components/layout/ProtectedRoute'
 import { LandingPage } from './pages/public/LandingPage'
 import { SpecialtiesPage } from './pages/public/SpecialtiesPage'
@@ -19,9 +20,9 @@ import { NotFoundPage } from './pages/public/NotFoundPage'
 
 function App () {
   return (
-    <div className='min-h-screen'>
+    <div className='flex min-h-screen flex-col'>
       <AppHeader />
-      <main className='mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8'>
+      <main className='mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8'>
         <Routes>
           <Route path='/' element={<LandingPage />} />
           <Route path='/especialidades' element={<SpecialtiesPage />} />
@@ -71,6 +72,7 @@ function App () {
           <Route path='*' element={<NotFoundPage />} />
         </Routes>
       </main>
+      <AppFooter />
     </div>
   )
 }
