@@ -14,3 +14,4 @@ backend/dev.sqlite
 CHANGELOG.md
 CONFIG.md
 docs/
+.vscode

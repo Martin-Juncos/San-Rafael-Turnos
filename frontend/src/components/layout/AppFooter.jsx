@@ -5,8 +5,8 @@ export function AppFooter () {
   return (
     <footer className='border-t border-emerald-200/70 bg-white/45 backdrop-blur-xl'>
       <div className='mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8'>
-        <div className='grid gap-8 lg:grid-cols-[1fr_auto_1fr] lg:items-start'>
-          <div className='space-y-3'>
+        <div className='grid grid-cols-2 gap-x-6 gap-y-8 lg:grid-cols-[1fr_auto_1fr] lg:items-start'>
+          <div className='order-2 space-y-3 lg:order-1'>
             <h4 className='text-xs font-semibold uppercase tracking-[0.18em] text-emerald-900/70'>
               Clinica
             </h4>
@@ -18,7 +18,7 @@ export function AppFooter () {
             </div>
           </div>
 
-          <div className='order-first flex flex-col items-start gap-3 text-left lg:order-none lg:items-center lg:text-center'>
+          <div className='order-1 col-span-2 flex flex-col items-center gap-3 text-center lg:order-2 lg:col-span-1'>
             <h3 className='text-xl font-semibold text-emerald-950 sm:text-2xl'>
               Clinica San Rafael Arcangel
             </h3>
@@ -65,11 +65,11 @@ export function AppFooter () {
             </div>
           </div>
 
-          <div className='space-y-3 lg:text-right'>
+          <div className='order-3 space-y-3 text-right lg:order-3'>
             <h4 className='text-xs font-semibold uppercase tracking-[0.18em] text-emerald-900/70'>
               Atencion
             </h4>
-            <div className='grid gap-2 text-sm text-emerald-900/85 lg:justify-items-end'>
+            <div className='grid justify-items-end gap-2 text-sm text-emerald-900/85'>
               <Link to='/reservar' className='transition hover:text-brand-700'>Reservar turno</Link>
               <Link to='/noticias' className='transition hover:text-brand-700'>Noticias</Link>
               <Link to='/preguntas-frecuentes' className='transition hover:text-brand-700'>
