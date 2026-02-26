@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Facebook, Instagram, Linkedin, Twitter } from 'lucide-react'
+import { SiFacebook, SiInstagram, SiLinkedin, SiX } from 'react-icons/si'
 
 export function AppFooter () {
   return (
@@ -33,7 +33,7 @@ export function AppFooter () {
                 aria-label='Facebook'
                 className='inline-flex h-12 w-12 items-center justify-center rounded-full border border-emerald-200/80 bg-white/70 text-brand-700 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-300 hover:bg-white sm:h-14 sm:w-14'
               >
-                <Facebook className='h-6 w-6' />
+                <SiFacebook className='h-6 w-6' />
               </a>
               <a
                 href='https://www.instagram.com'
@@ -42,7 +42,7 @@ export function AppFooter () {
                 aria-label='Instagram'
                 className='inline-flex h-12 w-12 items-center justify-center rounded-full border border-emerald-200/80 bg-white/70 text-brand-700 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-300 hover:bg-white sm:h-14 sm:w-14'
               >
-                <Instagram className='h-6 w-6' />
+                <SiInstagram className='h-6 w-6' />
               </a>
               <a
                 href='https://www.linkedin.com'
@@ -51,7 +51,7 @@ export function AppFooter () {
                 aria-label='LinkedIn'
                 className='inline-flex h-12 w-12 items-center justify-center rounded-full border border-emerald-200/80 bg-white/70 text-brand-700 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-300 hover:bg-white sm:h-14 sm:w-14'
               >
-                <Linkedin className='h-6 w-6' />
+                <SiLinkedin className='h-6 w-6' />
               </a>
               <a
                 href='https://x.com'
@@ -60,7 +60,7 @@ export function AppFooter () {
                 aria-label='Twitter / X'
                 className='inline-flex h-12 w-12 items-center justify-center rounded-full border border-emerald-200/80 bg-white/70 text-brand-700 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-300 hover:bg-white sm:h-14 sm:w-14'
               >
-                <Twitter className='h-6 w-6' />
+                <SiX className='h-6 w-6' />
               </a>
             </div>
           </div>
