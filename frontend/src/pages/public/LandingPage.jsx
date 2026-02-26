@@ -8,7 +8,6 @@ import {
   Clock3,
   HelpCircle,
   Newspaper,
-  LogIn,
   Mail,
   MapPinned,
   MapPin,
@@ -244,14 +243,6 @@ export function LandingPage () {
                   <span className='inline-flex items-center gap-2'>
                     <CalendarCheck2 className='h-4 w-4' />
                     Reservar turno
-                  </span>
-                </Button>
-              </Link>
-              <Link to='/ingresar'>
-                <Button variant='secondary'>
-                  <span className='inline-flex items-center gap-2'>
-                    <LogIn className='h-4 w-4' />
-                    Ingresar
                   </span>
                 </Button>
               </Link>
