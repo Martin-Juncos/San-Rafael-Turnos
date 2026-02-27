@@ -551,12 +551,24 @@ export function AdminDashboardPage () {
                   {specialty.description || 'Sin descripcion'}
                 </p>
               </div>
-              <div className='flex gap-2'>
-                <Button variant='secondary' className='px-3 py-1.5 text-xs' onClick={() => handleEditSpecialty(specialty)}>
-                  Modificar
+              <div className='flex items-center gap-1.5'>
+                <Button
+                  variant='secondary'
+                  className='!h-8 !w-8 !rounded-full !p-0 inline-flex items-center justify-center'
+                  onClick={() => handleEditSpecialty(specialty)}
+                  aria-label='Modificar especialidad'
+                  title='Modificar especialidad'
+                >
+                  <FiEdit2 size={13} />
                 </Button>
-                <Button variant='danger' className='px-3 py-1.5 text-xs' onClick={() => handleDeleteSpecialty(specialty.id)}>
-                  Eliminar
+                <Button
+                  variant='danger'
+                  className='!h-8 !w-8 !rounded-full !p-0 inline-flex items-center justify-center'
+                  onClick={() => handleDeleteSpecialty(specialty.id)}
+                  aria-label='Eliminar especialidad'
+                  title='Eliminar especialidad'
+                >
+                  <FiTrash2 size={13} />
                 </Button>
               </div>
             </div>
@@ -630,19 +642,31 @@ export function AdminDashboardPage () {
 
           <div className='grid gap-2 sm:grid-cols-2'>
             {doctors.map((doctor) => (
-              <div key={doctor.id} className='space-y-3 rounded-xl bg-white/70 p-3 text-sm'>
-                <div>
+              <div key={doctor.id} className='flex items-center justify-between gap-2 rounded-xl bg-white/70 p-3 text-sm'>
+                <div className='min-w-0'>
                   <p className='font-semibold text-emerald-950'>{doctor.fullName}</p>
                   <p className='text-xs text-emerald-900/70'>{doctor.email}</p>
                   <p className='text-xs text-emerald-900/70'>DNI: {doctor.dni || '-'}</p>
                   <p className='text-xs text-emerald-900/70'>Consultorio: {doctor.consultorio}</p>
                 </div>
-                <div className='flex gap-2'>
-                  <Button variant='secondary' className='px-3 py-1.5 text-xs' onClick={() => handleEditDoctor(doctor)}>
-                    Modificar
+                <div className='flex items-center gap-1.5'>
+                  <Button
+                    variant='secondary'
+                    className='!h-8 !w-8 !rounded-full !p-0 inline-flex items-center justify-center'
+                    onClick={() => handleEditDoctor(doctor)}
+                    aria-label='Modificar medico'
+                    title='Modificar medico'
+                  >
+                    <FiEdit2 size={13} />
                   </Button>
-                  <Button variant='danger' className='px-3 py-1.5 text-xs' onClick={() => handleDeleteDoctor(doctor.id)}>
-                    Eliminar
+                  <Button
+                    variant='danger'
+                    className='!h-8 !w-8 !rounded-full !p-0 inline-flex items-center justify-center'
+                    onClick={() => handleDeleteDoctor(doctor.id)}
+                    aria-label='Eliminar medico'
+                    title='Eliminar medico'
+                  >
+                    <FiTrash2 size={13} />
                   </Button>
                 </div>
               </div>
@@ -709,20 +733,32 @@ export function AdminDashboardPage () {
 
           <div className='grid gap-2 sm:grid-cols-2'>
             {secretaries.map((secretary) => (
-              <div key={secretary.id} className='space-y-3 rounded-xl bg-white/70 p-3 text-sm'>
-                <div>
+              <div key={secretary.id} className='flex items-center justify-between gap-2 rounded-xl bg-white/70 p-3 text-sm'>
+                <div className='min-w-0'>
                   <p className='font-semibold text-emerald-950'>{secretary.fullName || secretary.email}</p>
                   <p className='text-xs text-emerald-900/70'>{secretary.email}</p>
                   <p className='text-xs text-emerald-900/70'>Telefono: {secretary.phone || '-'}</p>
                   <p className='text-xs text-emerald-900/70'>DNI: {secretary.dni || '-'}</p>
                   <p className='text-xs text-emerald-900/70'>Medico: {secretary.doctor?.fullName || '-'}</p>
                 </div>
-                <div className='flex gap-2'>
-                  <Button variant='secondary' className='px-3 py-1.5 text-xs' onClick={() => handleEditSecretary(secretary)}>
-                    Modificar
+                <div className='flex items-center gap-1.5'>
+                  <Button
+                    variant='secondary'
+                    className='!h-8 !w-8 !rounded-full !p-0 inline-flex items-center justify-center'
+                    onClick={() => handleEditSecretary(secretary)}
+                    aria-label='Modificar secretaria'
+                    title='Modificar secretaria'
+                  >
+                    <FiEdit2 size={13} />
                   </Button>
-                  <Button variant='danger' className='px-3 py-1.5 text-xs' onClick={() => handleDeleteSecretary(secretary.id)}>
-                    Eliminar
+                  <Button
+                    variant='danger'
+                    className='!h-8 !w-8 !rounded-full !p-0 inline-flex items-center justify-center'
+                    onClick={() => handleDeleteSecretary(secretary.id)}
+                    aria-label='Eliminar secretaria'
+                    title='Eliminar secretaria'
+                  >
+                    <FiTrash2 size={13} />
                   </Button>
                 </div>
               </div>
