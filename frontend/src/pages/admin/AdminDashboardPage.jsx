@@ -39,6 +39,7 @@ export function AdminDashboardPage () {
     consultorio: '',
     specialtyId: ''
   })
+  const [editingDoctorId, setEditingDoctorId] = useState('')
   const [secretaryForm, setSecretaryForm] = useState({
     fullName: '',
     email: '',
@@ -46,6 +47,7 @@ export function AdminDashboardPage () {
     dni: '',
     doctorId: ''
   })
+  const [editingSecretaryId, setEditingSecretaryId] = useState('')
 
   const [availabilityDoctorId, setAvailabilityDoctorId] = useState('')
   const [availabilityDraft, setAvailabilityDraft] = useState([])
@@ -131,50 +133,74 @@ export function AdminDashboardPage () {
     }
   }
 
-  const handleCreateDoctor = async (event) => {
+  const resetDoctorForm = () => {
+    setDoctorForm({ fullName: '', email: '', phone: '', dni: '', consultorio: '', specialtyId: '' })
+    setEditingDoctorId('')
+  }
+
+  const resetSecretaryForm = () => {
+    setSecretaryForm({ fullName: '', email: '', phone: '', dni: '', doctorId: '' })
+    setEditingSecretaryId('')
+  }
+
+  const handleSubmitDoctor = async (event) => {
     event.preventDefault()
     setError('')
     setMessage('')
     const doctorName = doctorForm.fullName.trim()
     const doctorEmail = doctorForm.email.trim()
+    const payload = {
+      fullName: doctorName,
+      email: doctorEmail,
+      phone: doctorForm.phone.trim(),
+      specialtyId: doctorForm.specialtyId,
+      consultorio: Number(doctorForm.consultorio)
+    }
+    if (doctorForm.dni) {
+      payload.dni = doctorForm.dni.replace(/\D/g, '')
+    }
+
     try {
-      await doctorsService.create({
-        ...doctorForm,
-        consultorio: Number(doctorForm.consultorio)
-      })
-      setDoctorForm({ fullName: '', email: '', phone: '', dni: '', consultorio: '', specialtyId: '' })
+      if (editingDoctorId) {
+        await doctorsService.update(editingDoctorId, payload)
+        setMessage(`Se actualizo el medico ${doctorName}.`)
+      } else {
+        await doctorsService.create(payload)
+        setMessage(`Se creo el medico ${doctorName}. Credenciales iniciales: ${doctorEmail} + DNI.`)
+      }
+      resetDoctorForm()
       await load()
-      setMessage(`Se creo el medico ${doctorName}. Credenciales iniciales: ${doctorEmail} + DNI.`)
     } catch (apiError) {
       setError(apiError.message)
     }
   }
 
-  const handleCreateSecretary = async (event) => {
+  const handleSubmitSecretary = async (event) => {
     event.preventDefault()
     setError('')
     setMessage('')
     const secretaryName = secretaryForm.fullName.trim()
     const secretaryEmail = secretaryForm.email.trim()
-    const secretaryDni = secretaryForm.dni.replace(/\D/g, '')
+    const payload = {
+      fullName: secretaryName,
+      email: secretaryEmail,
+      phone: secretaryForm.phone.trim(),
+      doctorId: secretaryForm.doctorId
+    }
+    if (secretaryForm.dni) {
+      payload.dni = secretaryForm.dni.replace(/\D/g, '')
+    }
 
     try {
-      await secretariesService.create({
-        fullName: secretaryName,
-        email: secretaryEmail,
-        phone: secretaryForm.phone.trim(),
-        dni: secretaryDni,
-        doctorId: secretaryForm.doctorId
-      })
-      setSecretaryForm({
-        fullName: '',
-        email: '',
-        phone: '',
-        dni: '',
-        doctorId: ''
-      })
+      if (editingSecretaryId) {
+        await secretariesService.update(editingSecretaryId, payload)
+        setMessage(`Se actualizo la secretaria ${secretaryName}.`)
+      } else {
+        await secretariesService.create(payload)
+        setMessage(`Se creo la secretaria ${secretaryName}. Credenciales iniciales: ${secretaryEmail} + DNI.`)
+      }
+      resetSecretaryForm()
       await load()
-      setMessage(`Se creo la secretaria ${secretaryName}. Credenciales iniciales: ${secretaryEmail} + DNI.`)
     } catch (apiError) {
       setError(apiError.message)
     }
@@ -230,11 +256,26 @@ export function AdminDashboardPage () {
     const doctorName = doctors.find((item) => item.id === id)?.fullName
     try {
       await doctorsService.remove(id)
+      if (editingDoctorId === id) {
+        resetDoctorForm()
+      }
       await load()
       setMessage(`Se elimino el medico "${doctorName || 'seleccionado'}".`)
     } catch (apiError) {
       setError(apiError.message)
     }
+  }
+
+  const handleEditDoctor = (doctor) => {
+    setEditingDoctorId(doctor.id)
+    setDoctorForm({
+      fullName: doctor.fullName || '',
+      email: doctor.email || '',
+      phone: doctor.phone || '',
+      dni: doctor.dni || '',
+      consultorio: String(doctor.consultorio || ''),
+      specialtyId: doctor.specialtyId || ''
+    })
   }
 
   const handleDeleteSecretary = async (id) => {
@@ -243,11 +284,25 @@ export function AdminDashboardPage () {
     const secretaryName = secretaries.find((item) => item.id === id)?.fullName || secretaries.find((item) => item.id === id)?.email
     try {
       await secretariesService.remove(id)
+      if (editingSecretaryId === id) {
+        resetSecretaryForm()
+      }
       await load()
       setMessage(`Se elimino la secretaria "${secretaryName || 'seleccionada'}".`)
     } catch (apiError) {
       setError(apiError.message)
     }
+  }
+
+  const handleEditSecretary = (secretary) => {
+    setEditingSecretaryId(secretary.id)
+    setSecretaryForm({
+      fullName: secretary.fullName || '',
+      email: secretary.email || '',
+      phone: secretary.phone || '',
+      dni: secretary.dni || '',
+      doctorId: secretary.doctorId || ''
+    })
   }
 
   const handleDeleteInsurance = async (id) => {
@@ -382,8 +437,13 @@ export function AdminDashboardPage () {
 
       <div className='grid gap-6 xl:grid-cols-2'>
         <Card className='space-y-4'>
-          <h2 className='text-lg font-semibold text-emerald-950'>Medicos</h2>
-          <form className='grid gap-2 sm:grid-cols-2' onSubmit={handleCreateDoctor}>
+          <div className='space-y-1'>
+            <h2 className='text-lg font-semibold text-emerald-950'>Medicos</h2>
+            <p className='text-xs text-emerald-900/70'>
+              {editingDoctorId ? 'Editando medico seleccionado.' : 'Carga y administra profesionales.'}
+            </p>
+          </div>
+          <form className='grid gap-2 sm:grid-cols-2' onSubmit={handleSubmitDoctor}>
             <Input
               label='Nombre'
               value={doctorForm.fullName}
@@ -425,29 +485,51 @@ export function AdminDashboardPage () {
                 ))}
               </select>
             </label>
-            <Button type='submit' className='sm:col-span-2'>Crear medico</Button>
+            <div className='sm:col-span-2 flex flex-wrap gap-2'>
+              <Button type='submit'>
+                {editingDoctorId ? 'Guardar cambios' : 'Crear medico'}
+              </Button>
+              {editingDoctorId
+                ? (
+                  <Button type='button' variant='secondary' onClick={resetDoctorForm}>
+                    Cancelar edicion
+                  </Button>
+                  )
+                : null}
+            </div>
           </form>
 
-          <div className='space-y-2'>
+          <div className='grid gap-2 sm:grid-cols-2'>
             {doctors.map((doctor) => (
-              <div key={doctor.id} className='flex items-center justify-between rounded-xl bg-white/70 p-3 text-sm'>
+              <div key={doctor.id} className='space-y-3 rounded-xl bg-white/70 p-3 text-sm'>
                 <div>
                   <p className='font-semibold text-emerald-950'>{doctor.fullName}</p>
                   <p className='text-xs text-emerald-900/70'>{doctor.email}</p>
                   <p className='text-xs text-emerald-900/70'>DNI: {doctor.dni || '-'}</p>
                   <p className='text-xs text-emerald-900/70'>Consultorio: {doctor.consultorio}</p>
                 </div>
-                <Button variant='danger' className='px-3 py-1.5 text-xs' onClick={() => handleDeleteDoctor(doctor.id)}>
-                  Eliminar
-                </Button>
+                <div className='flex gap-2'>
+                  <Button variant='secondary' className='px-3 py-1.5 text-xs' onClick={() => handleEditDoctor(doctor)}>
+                    Modificar
+                  </Button>
+                  <Button variant='danger' className='px-3 py-1.5 text-xs' onClick={() => handleDeleteDoctor(doctor.id)}>
+                    Eliminar
+                  </Button>
+                </div>
               </div>
             ))}
+            {doctors.length === 0 ? <p className='text-sm text-emerald-900/75'>No hay medicos cargados.</p> : null}
           </div>
         </Card>
 
         <Card className='space-y-4'>
-          <h2 className='text-lg font-semibold text-emerald-950'>Secretaria</h2>
-          <form className='grid gap-2 sm:grid-cols-2' onSubmit={handleCreateSecretary}>
+          <div className='space-y-1'>
+            <h2 className='text-lg font-semibold text-emerald-950'>Secretaria</h2>
+            <p className='text-xs text-emerald-900/70'>
+              {editingSecretaryId ? 'Editando secretaria seleccionada.' : 'Asigna secretarias por medico.'}
+            </p>
+          </div>
+          <form className='grid gap-2 sm:grid-cols-2' onSubmit={handleSubmitSecretary}>
             <Input
               label='Nombre'
               value={secretaryForm.fullName}
@@ -482,12 +564,23 @@ export function AdminDashboardPage () {
                 ))}
               </select>
             </label>
-            <Button type='submit' className='sm:col-span-2'>Crear secretaria</Button>
+            <div className='sm:col-span-2 flex flex-wrap gap-2'>
+              <Button type='submit'>
+                {editingSecretaryId ? 'Guardar cambios' : 'Crear secretaria'}
+              </Button>
+              {editingSecretaryId
+                ? (
+                  <Button type='button' variant='secondary' onClick={resetSecretaryForm}>
+                    Cancelar edicion
+                  </Button>
+                  )
+                : null}
+            </div>
           </form>
 
-          <div className='space-y-2'>
+          <div className='grid gap-2 sm:grid-cols-2'>
             {secretaries.map((secretary) => (
-              <div key={secretary.id} className='flex items-center justify-between rounded-xl bg-white/70 p-3 text-sm'>
+              <div key={secretary.id} className='space-y-3 rounded-xl bg-white/70 p-3 text-sm'>
                 <div>
                   <p className='font-semibold text-emerald-950'>{secretary.fullName || secretary.email}</p>
                   <p className='text-xs text-emerald-900/70'>{secretary.email}</p>
@@ -495,9 +588,14 @@ export function AdminDashboardPage () {
                   <p className='text-xs text-emerald-900/70'>DNI: {secretary.dni || '-'}</p>
                   <p className='text-xs text-emerald-900/70'>Medico: {secretary.doctor?.fullName || '-'}</p>
                 </div>
-                <Button variant='danger' className='px-3 py-1.5 text-xs' onClick={() => handleDeleteSecretary(secretary.id)}>
-                  Eliminar
-                </Button>
+                <div className='flex gap-2'>
+                  <Button variant='secondary' className='px-3 py-1.5 text-xs' onClick={() => handleEditSecretary(secretary)}>
+                    Modificar
+                  </Button>
+                  <Button variant='danger' className='px-3 py-1.5 text-xs' onClick={() => handleDeleteSecretary(secretary.id)}>
+                    Eliminar
+                  </Button>
+                </div>
               </div>
             ))}
             {secretaries.length === 0 ? <p className='text-sm text-emerald-900/75'>No hay secretarias cargadas.</p> : null}

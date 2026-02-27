@@ -43,6 +43,21 @@ export const secretaryIdSchema = z.object({
   })
 })
 
+export const updateSecretarySchema = z.object({
+  body: z.object({
+    fullName: z.string().min(3).max(120).optional(),
+    email: z.string().email().optional(),
+    phone: z.string().min(8).max(20).optional(),
+    dni: z.string().regex(/^\d{6,12}$/).optional(),
+    doctorId: z.string().uuid().optional(),
+    isActive: z.boolean().optional()
+  }).refine((value) => Object.keys(value).length > 0, 'Sin campos para actualizar'),
+  query: z.object({}).optional(),
+  params: z.object({
+    id: z.string().uuid()
+  })
+})
+
 export const listSecretaries = async (req, res) => {
   const { query = {} } = req.validated
   const { page, pageSize, offset, limit } = parsePagination(query)
@@ -132,6 +147,64 @@ export const createSecretary = async (req, res) => {
   })
 
   ok(res, created, 'secretary_created', 201)
+}
+
+export const updateSecretary = async (req, res) => {
+  const item = await User.findOne({
+    where: {
+      id: req.validated.params.id,
+      role: 'doctor',
+      accountType: 'secretary'
+    }
+  })
+  if (!item) {
+    throw new AppError('Secretaria no encontrada', 404, 'secretary_not_found')
+  }
+
+  const patch = { ...req.validated.body }
+  if (patch.fullName) patch.fullName = patch.fullName.trim()
+  if (patch.phone) patch.phone = normalizePhone(patch.phone)
+  if (patch.dni) patch.dni = normalizeDni(patch.dni)
+
+  if (patch.doctorId) {
+    const doctor = await Doctor.findByPk(patch.doctorId)
+    if (!doctor) {
+      throw new AppError('Medico no encontrado', 404, 'doctor_not_found')
+    }
+  }
+
+  if (patch.dni) {
+    patch.passwordHash = await bcrypt.hash(patch.dni, 10)
+  }
+
+  try {
+    await item.update(patch)
+  } catch (error) {
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      throw new AppError('Ya existe un usuario con ese correo', 409, 'secretary_conflict')
+    }
+    throw error
+  }
+
+  await writeAuditLog({
+    actorRole: req.auth.role,
+    actorId: req.auth.sub,
+    action: 'SECRETARY_UPDATED',
+    entity: 'User',
+    entityId: item.id,
+    meta: {
+      accountType: 'secretary',
+      ...patch,
+      ...(patch.passwordHash ? { passwordHash: '[redacted]' } : {})
+    }
+  })
+
+  const updated = await User.findByPk(item.id, {
+    attributes: { exclude: ['passwordHash'] },
+    include: [{ model: Doctor, as: 'doctor' }]
+  })
+
+  ok(res, updated, 'secretary_updated')
 }
 
 export const deleteSecretary = async (req, res) => {

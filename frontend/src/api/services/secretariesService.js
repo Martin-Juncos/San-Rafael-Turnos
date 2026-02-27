@@ -11,5 +11,6 @@ export const secretariesService = {
     }
   },
   create: async (payload) => unwrapData(await httpClient.post('/secretaries', payload)),
+  update: async (id, payload) => unwrapData(await httpClient.patch(`/secretaries/${id}`, payload)),
   remove: async (id) => unwrapData(await httpClient.delete(`/secretaries/${id}`))
 }
