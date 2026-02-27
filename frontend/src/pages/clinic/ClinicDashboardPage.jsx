@@ -891,11 +891,19 @@ export function ClinicDashboardPage () {
                 ))}
               </select>
             </label>
-            <Input
-              label='Buscar medico'
-              value={doctorFilters.search}
-              onChange={(event) => setDoctorFilters((prev) => ({ ...prev, search: event.target.value }))}
-            />
+            <label className='space-y-1'>
+              <span className='text-xs text-emerald-900/75'>Buscar medico</span>
+              <select
+                className='glass-input'
+                value={doctorFilters.search}
+                onChange={(event) => setDoctorFilters((prev) => ({ ...prev, search: event.target.value }))}
+              >
+                <option value=''>Todos</option>
+                {doctors.map((doctor) => (
+                  <option key={doctor.id} value={doctor.fullName}>{doctor.fullName}</option>
+                ))}
+              </select>
+            </label>
             <Input
               label='Fecha agenda'
               type='date'
