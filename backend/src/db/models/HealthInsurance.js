@@ -12,8 +12,7 @@ export const initHealthInsuranceModel = (sequelize) => {
       },
       name: {
         type: DataTypes.STRING,
-        allowNull: false,
-        unique: true
+        allowNull: false
       },
       discountPercent: {
         type: DataTypes.DECIMAL(5, 2),
@@ -34,7 +33,15 @@ export const initHealthInsuranceModel = (sequelize) => {
       sequelize,
       modelName: 'HealthInsurance',
       tableName: 'HealthInsurance',
-      paranoid: true
+      paranoid: true,
+      indexes: [
+        {
+          fields: ['name']
+        },
+        {
+          fields: ['discountPercent']
+        }
+      ]
     }
   )
 

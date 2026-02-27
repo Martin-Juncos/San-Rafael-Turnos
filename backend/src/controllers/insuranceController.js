@@ -1,12 +1,37 @@
 import { Op } from 'sequelize'
 import { z } from 'zod'
-import { HealthInsurance } from '../db/models/index.js'
+import { HealthInsurance, sequelize } from '../db/models/index.js'
 import { AppError } from '../utils/errors.js'
 import { ok, paginated } from '../utils/response.js'
 import { parsePagination, buildPagination } from '../utils/pagination.js'
 import { writeAuditLog } from '../utils/audit.js'
 
 const normalizeInsuranceName = (value) => String(value ?? '').trim().replace(/\s+/g, ' ')
+let insuranceUniquenessEnsured = false
+
+const ensureInsuranceUniquenessRule = async () => {
+  if (insuranceUniquenessEnsured) {
+    return
+  }
+
+  await sequelize.query(`
+    ALTER TABLE "HealthInsurance"
+    DROP CONSTRAINT IF EXISTS "HealthInsurance_name_key";
+  `)
+  await sequelize.query(`
+    DROP INDEX IF EXISTS "healthinsurance_name_key";
+  `)
+  await sequelize.query(`
+    DROP INDEX IF EXISTS "healthinsurance_unique_name_discount_active";
+  `)
+  await sequelize.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS "healthinsurance_unique_name_discount_active"
+    ON "HealthInsurance" (LOWER("name"), "discountPercent")
+    WHERE "deletedAt" IS NULL;
+  `)
+
+  insuranceUniquenessEnsured = true
+}
 
 export const listInsurancesSchema = z.object({
   body: z.object({}).optional(),
@@ -75,24 +100,29 @@ export const listInsurances = async (req, res) => {
 }
 
 export const createInsurance = async (req, res) => {
+  try {
+    await ensureInsuranceUniquenessRule()
+  } catch (_error) {}
+
   const payload = {
     ...req.validated.body,
     name: normalizeInsuranceName(req.validated.body.name)
   }
 
-  const existing = await HealthInsurance.findOne({
+  const existingSameNameAndDiscount = await HealthInsurance.findOne({
     where: {
       name: {
         [Op.iLike]: payload.name
-      }
+      },
+      discountPercent: payload.discountPercent
     },
     paranoid: false
   })
 
-  if (existing) {
-    if (existing.deletedAt) {
-      await existing.restore()
-      await existing.update({
+  if (existingSameNameAndDiscount) {
+    if (existingSameNameAndDiscount.deletedAt) {
+      await existingSameNameAndDiscount.restore()
+      await existingSameNameAndDiscount.update({
         name: payload.name,
         discountPercent: payload.discountPercent,
         isActive: payload.isActive ?? true
@@ -103,18 +133,26 @@ export const createInsurance = async (req, res) => {
         actorId: req.auth.sub,
         action: 'INSURANCE_RESTORED',
         entity: 'HealthInsurance',
-        entityId: existing.id,
+        entityId: existingSameNameAndDiscount.id,
         meta: payload
       })
 
-      ok(res, existing, 'insurance_restored')
+      ok(res, existingSameNameAndDiscount, 'insurance_restored')
       return
     }
 
-    throw new AppError('Ya existe una obra social con ese nombre', 409, 'insurance_conflict')
+    throw new AppError('Ya existe una obra social con ese nombre y porcentaje', 409, 'insurance_conflict')
   }
 
-  const item = await HealthInsurance.create(payload)
+  let item
+  try {
+    item = await HealthInsurance.create(payload)
+  } catch (error) {
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      throw new AppError('Ya existe una obra social con ese nombre y porcentaje', 409, 'insurance_conflict')
+    }
+    throw error
+  }
 
   await writeAuditLog({
     actorRole: req.auth.role,
@@ -129,6 +167,10 @@ export const createInsurance = async (req, res) => {
 }
 
 export const updateInsurance = async (req, res) => {
+  try {
+    await ensureInsuranceUniquenessRule()
+  } catch (_error) {}
+
   const item = await HealthInsurance.findByPk(req.validated.params.id)
   if (!item) {
     throw new AppError('Obra social no encontrada', 404, 'insurance_not_found')
@@ -137,23 +179,38 @@ export const updateInsurance = async (req, res) => {
   const patch = { ...req.validated.body }
   if (patch.name) {
     patch.name = normalizeInsuranceName(patch.name)
-    const duplicate = await HealthInsurance.findOne({
-      where: {
-        id: {
-          [Op.ne]: item.id
-        },
-        name: {
-          [Op.iLike]: patch.name
-        }
-      },
-      paranoid: false
-    })
-    if (duplicate) {
-      throw new AppError('Ya existe una obra social con ese nombre', 409, 'insurance_conflict')
-    }
   }
 
-  await item.update(patch)
+  const targetName = patch.name || item.name
+  const targetDiscountPercent =
+    typeof patch.discountPercent !== 'undefined'
+      ? patch.discountPercent
+      : item.discountPercent
+
+  const duplicate = await HealthInsurance.findOne({
+    where: {
+      id: {
+        [Op.ne]: item.id
+      },
+      name: {
+        [Op.iLike]: targetName
+      },
+      discountPercent: targetDiscountPercent
+    }
+  })
+
+  if (duplicate) {
+    throw new AppError('Ya existe una obra social con ese nombre y porcentaje', 409, 'insurance_conflict')
+  }
+
+  try {
+    await item.update(patch)
+  } catch (error) {
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      throw new AppError('Ya existe una obra social con ese nombre y porcentaje', 409, 'insurance_conflict')
+    }
+    throw error
+  }
 
   await writeAuditLog({
     actorRole: req.auth.role,

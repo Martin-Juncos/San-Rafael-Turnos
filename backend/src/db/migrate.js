@@ -7,6 +7,18 @@ const run = async () => {
     await sequelize.authenticate()
     await sequelize.sync({ alter: true })
     await sequelize.query(`
+      ALTER TABLE "HealthInsurance"
+      DROP CONSTRAINT IF EXISTS "HealthInsurance_name_key";
+    `)
+    await sequelize.query(`
+      DROP INDEX IF EXISTS "healthinsurance_unique_name_discount_active";
+    `)
+    await sequelize.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS "healthinsurance_unique_name_discount_active"
+      ON "HealthInsurance" (LOWER("name"), "discountPercent")
+      WHERE "deletedAt" IS NULL;
+    `)
+    await sequelize.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS appointment_unique_active_slot
       ON "Appointment" ("doctorId", "date", "startTime")
       WHERE status IN ('hold', 'confirmed');
