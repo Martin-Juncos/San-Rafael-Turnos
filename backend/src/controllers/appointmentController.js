@@ -31,6 +31,8 @@ const createAppointmentBodySchema = z.object({
   fullName: z.string().min(3).max(120),
   dni: z.string().min(6).max(12),
   phone: z.string().min(8).max(20),
+  streetAndNumber: z.string().min(3).max(160).optional(),
+  city: z.string().min(2).max(120).optional(),
   slotMinutes: z.coerce.number().int().min(10).max(120).optional()
 })
 
@@ -134,11 +136,22 @@ const ensureAppointmentPermission = (auth, appointment) => {
   throw new AppError('Prohibido', 403, 'forbidden')
 }
 
-const normalizePatientPayload = ({ fullName, dni, phone }) => ({
-  fullName: fullName.trim(),
-  dni: String(dni).replace(/\D/g, ''),
-  phone: String(phone).replace(/[^\d+]/g, '')
-})
+const normalizePatientPayload = ({ fullName, dni, phone, streetAndNumber, city }) => {
+  const normalized = {
+    fullName: fullName.trim(),
+    dni: String(dni).replace(/\D/g, ''),
+    phone: String(phone).replace(/[^\d+]/g, '')
+  }
+
+  if (typeof streetAndNumber !== 'undefined') {
+    normalized.streetAndNumber = streetAndNumber.trim() || null
+  }
+  if (typeof city !== 'undefined') {
+    normalized.city = city.trim() || null
+  }
+
+  return normalized
+}
 
 export const createAppointment = async (req, res) => {
   const payload = req.validated.body
@@ -180,10 +193,26 @@ export const createAppointment = async (req, res) => {
 
       const [patient] = await Patient.findOrCreate({
         where: { dni: patientInput.dni },
-        defaults: patientInput,
+        defaults: {
+          dni: patientInput.dni,
+          fullName: patientInput.fullName,
+          phone: patientInput.phone,
+          streetAndNumber: patientInput.streetAndNumber ?? null,
+          city: patientInput.city ?? null
+        },
         transaction
       })
-      await patient.update(patientInput, { transaction })
+      const patientUpdatePayload = {
+        fullName: patientInput.fullName,
+        phone: patientInput.phone
+      }
+      if ('streetAndNumber' in patientInput) {
+        patientUpdatePayload.streetAndNumber = patientInput.streetAndNumber
+      }
+      if ('city' in patientInput) {
+        patientUpdatePayload.city = patientInput.city
+      }
+      await patient.update(patientUpdatePayload, { transaction })
 
       const specialty = await Specialty.findByPk(payload.specialtyId, { transaction })
       if (!specialty) {

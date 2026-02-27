@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom'
 import { SiFacebook, SiInstagram, SiLinkedin, SiX } from 'react-icons/si'
+import { useReserveLink } from '../../hooks/useReserveLink'
 
 export function AppFooter () {
+  const reserveLink = useReserveLink()
+
   return (
     <footer className='border-t border-emerald-200/70 bg-white/45 backdrop-blur-xl print:hidden'>
       <div className='mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8'>
@@ -70,7 +73,7 @@ export function AppFooter () {
               Atencion
             </h4>
             <div className='grid justify-items-end gap-2 text-sm text-emerald-900/85'>
-              <Link to='/reservar' className='transition hover:text-brand-700'>Reservar turno</Link>
+              <Link to={reserveLink} className='transition hover:text-brand-700'>Reservar turno</Link>
               <Link to='/noticias' className='transition hover:text-brand-700'>Noticias</Link>
               <Link to='/preguntas-frecuentes' className='transition hover:text-brand-700'>
                 Preguntas frecuentes

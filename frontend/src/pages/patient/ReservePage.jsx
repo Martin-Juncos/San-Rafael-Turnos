@@ -4,7 +4,15 @@ import { Card } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
 import { ActionResultModal } from '../../components/ui/ActionResultModal'
-import { appointmentsService, doctorsService, insurancesService, paymentsService, slotsService, specialtiesService } from '../../api/services'
+import {
+  appointmentsService,
+  doctorsService,
+  insurancesService,
+  patientAuthService,
+  paymentsService,
+  slotsService,
+  specialtiesService
+} from '../../api/services'
 import { useAppSelector } from '../../app/hooks'
 import { selectAuth } from '../../features/auth/authSlice'
 
@@ -76,8 +84,11 @@ export function ReservePage () {
     cvv: ''
   })
   const summaryRef = useRef(null)
+  const isPatientRole = auth.role === 'patient'
+  const isStaffBooking = ['admin', 'clinic', 'doctor'].includes(auth.role)
 
   const today = useMemo(() => toLocalIsoDate(), [])
+  const normalizeDni = (value) => String(value || '').replace(/\D/g, '')
   const [form, setForm] = useState({
     specialtyId: '',
     doctorId: '',
@@ -87,8 +98,52 @@ export function ReservePage () {
     fullName: auth.patient?.fullName || '',
     dni: auth.patient?.dni || '',
     phone: auth.patient?.phone || '',
+    streetAndNumber: auth.patient?.streetAndNumber || '',
+    city: auth.patient?.city || '',
     symptoms: ''
   })
+  const [patientLookupLoading, setPatientLookupLoading] = useState(false)
+  const [patientLookupDone, setPatientLookupDone] = useState(isPatientRole)
+  const [patientExists, setPatientExists] = useState(isPatientRole)
+  const [patientLookupMessage, setPatientLookupMessage] = useState(
+    isPatientRole ? 'Estas reservando con los datos de tu cuenta.' : ''
+  )
+
+  useEffect(() => {
+    if (isPatientRole) {
+      setPatientLookupDone(true)
+      setPatientExists(true)
+      setPatientLookupMessage('Estas reservando con los datos de tu cuenta.')
+      setForm((prev) => ({
+        ...prev,
+        fullName: auth.patient?.fullName || prev.fullName,
+        dni: auth.patient?.dni || prev.dni,
+        phone: auth.patient?.phone || prev.phone,
+        streetAndNumber: auth.patient?.streetAndNumber || prev.streetAndNumber,
+        city: auth.patient?.city || prev.city
+      }))
+      return
+    }
+
+    setPatientLookupDone(false)
+    setPatientExists(false)
+    setPatientLookupMessage('')
+    setForm((prev) => ({
+      ...prev,
+      fullName: '',
+      dni: '',
+      phone: '',
+      streetAndNumber: '',
+      city: ''
+    }))
+  }, [
+    isPatientRole,
+    auth.patient?.fullName,
+    auth.patient?.dni,
+    auth.patient?.phone,
+    auth.patient?.streetAndNumber,
+    auth.patient?.city
+  ])
 
   useEffect(() => {
     const load = async () => {
@@ -164,6 +219,61 @@ export function ReservePage () {
     setSuccess('')
     setError('')
     setPaymentError('')
+  }
+
+  const handlePatientDniChange = (value) => {
+    const dni = normalizeDni(value)
+    setForm((prev) => ({
+      ...prev,
+      dni,
+      fullName: '',
+      phone: '',
+      streetAndNumber: '',
+      city: ''
+    }))
+    setPatientLookupDone(false)
+    setPatientExists(false)
+    setPatientLookupMessage('')
+  }
+
+  const lookupPatientByDni = async () => {
+    setError('')
+    setSuccess('')
+    setPaymentError('')
+    setPatientLookupMessage('')
+
+    const dni = normalizeDni(form.dni)
+    if (dni.length < 6 || dni.length > 12) {
+      setError('Ingresa un DNI valido para continuar.')
+      return
+    }
+
+    setPatientLookupLoading(true)
+    try {
+      const result = await patientAuthService.prefillByDni(dni)
+      const exists = Boolean(result?.exists && result?.patient)
+      setPatientLookupDone(true)
+      setPatientExists(exists)
+      setForm((prev) => ({
+        ...prev,
+        dni,
+        fullName: exists ? (result.patient.fullName || '') : '',
+        phone: exists ? (result.patient.phone || '') : '',
+        streetAndNumber: exists ? (result.patient.streetAndNumber || '') : '',
+        city: exists ? (result.patient.city || '') : ''
+      }))
+      setPatientLookupMessage(
+        exists
+          ? 'Paciente encontrado. Revisa los datos y continua con la reserva.'
+          : 'No encontramos ese DNI. Completa los datos para crear el turno.'
+      )
+    } catch (apiError) {
+      setError(apiError.message || 'No se pudo verificar el DNI del paciente.')
+      setPatientLookupDone(false)
+      setPatientExists(false)
+    } finally {
+      setPatientLookupLoading(false)
+    }
   }
 
   const filteredDoctors = useMemo(() => {
@@ -347,9 +457,48 @@ export function ReservePage () {
       setError('Debes iniciar sesion para cargar un turno.')
       return
     }
+
+    if (!form.doctorId || !form.specialtyId || !form.date || !form.startTime) {
+      setError('Completa profesional, especialidad, fecha y horario para continuar.')
+      return
+    }
+
+    if (isStaffBooking && !patientLookupDone) {
+      setError('Primero verifica el DNI del paciente.')
+      return
+    }
+
+    const normalizedDni = normalizeDni(form.dni)
+    if (normalizedDni.length < 6 || normalizedDni.length > 12) {
+      setError('Ingresa un DNI valido del paciente.')
+      return
+    }
+    if (!form.fullName.trim() || form.fullName.trim().length < 3) {
+      setError('Completa el nombre del paciente.')
+      return
+    }
+    if (!form.phone.trim() || form.phone.trim().length < 8) {
+      setError('Completa un telefono valido del paciente.')
+      return
+    }
+    if (isStaffBooking && !patientExists && (!form.streetAndNumber.trim() || form.streetAndNumber.trim().length < 3)) {
+      setError('Completa calle y numero del paciente para continuar.')
+      return
+    }
+    if (isStaffBooking && !patientExists && (!form.city.trim() || form.city.trim().length < 2)) {
+      setError('Completa la ciudad del paciente para continuar.')
+      return
+    }
+
     try {
       const payload = {
         ...form,
+        fullName: form.fullName.trim(),
+        dni: normalizedDni,
+        phone: form.phone.trim(),
+        streetAndNumber: form.streetAndNumber.trim() || undefined,
+        city: form.city.trim() || undefined,
+        symptoms: form.symptoms.trim() || undefined,
         insuranceId: form.insuranceId || undefined
       }
       const data = await appointmentsService.create(payload)
@@ -668,27 +817,87 @@ export function ReservePage () {
                 ))}
           </div>
 
-          <div className='grid gap-3 sm:grid-cols-2'>
-            <Input
-              label='Nombre completo'
-              value={form.fullName}
-              onChange={(event) => setForm((prev) => ({ ...prev, fullName: event.target.value }))}
-            />
-            <Input
-              label='DNI'
-              value={form.dni}
-              onChange={(event) => setForm((prev) => ({ ...prev, dni: event.target.value }))}
-            />
-            <Input
-              label='Telefono'
-              value={form.phone}
-              onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))}
-            />
-            <Input
-              label='Motivo / sintomas'
-              value={form.symptoms}
-              onChange={(event) => setForm((prev) => ({ ...prev, symptoms: event.target.value }))}
-            />
+          <div className='space-y-3 rounded-xl border border-emerald-200/70 bg-white/70 p-3'>
+            <p className='text-xs font-semibold uppercase tracking-wide text-emerald-900/70'>
+              Datos del paciente
+            </p>
+
+            {isStaffBooking
+              ? (
+                <div className='grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end'>
+                  <Input
+                    label='DNI'
+                    value={form.dni}
+                    onChange={(event) => handlePatientDniChange(event.target.value)}
+                    placeholder='Solo numeros'
+                  />
+                  <Button
+                    type='button'
+                    variant='secondary'
+                    onClick={lookupPatientByDni}
+                    disabled={patientLookupLoading}
+                  >
+                    {patientLookupLoading ? 'Verificando...' : 'Verificar DNI'}
+                  </Button>
+                  <Button
+                    type='button'
+                    variant='secondary'
+                    onClick={() => handlePatientDniChange('')}
+                    disabled={!form.dni && !patientLookupDone}
+                  >
+                    Cambiar DNI
+                  </Button>
+                </div>
+                )
+              : (
+                <Input label='DNI' value={form.dni} disabled />
+                )}
+
+            {patientLookupMessage
+              ? (
+                <p className='rounded-xl border border-emerald-200/70 bg-emerald-50/80 px-3 py-2 text-xs text-emerald-900/80'>
+                  {patientLookupMessage}
+                </p>
+                )
+              : null}
+
+            {isStaffBooking && !patientLookupDone
+              ? (
+                <p className='text-xs text-amber-700'>
+                  Verifica el DNI para desplegar y completar los datos del paciente.
+                </p>
+                )
+              : (
+                <div className='grid gap-3 sm:grid-cols-2'>
+                  <Input
+                    label='Nombre completo'
+                    value={form.fullName}
+                    onChange={(event) => setForm((prev) => ({ ...prev, fullName: event.target.value }))}
+                  />
+                  <Input
+                    label='Telefono'
+                    value={form.phone}
+                    onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))}
+                  />
+                  <Input
+                    label='Calle y numero'
+                    value={form.streetAndNumber}
+                    onChange={(event) => setForm((prev) => ({ ...prev, streetAndNumber: event.target.value }))}
+                  />
+                  <Input
+                    label='Ciudad'
+                    value={form.city}
+                    onChange={(event) => setForm((prev) => ({ ...prev, city: event.target.value }))}
+                  />
+                  <div className='sm:col-span-2'>
+                    <Input
+                      label='Motivo / sintomas'
+                      value={form.symptoms}
+                      onChange={(event) => setForm((prev) => ({ ...prev, symptoms: event.target.value }))}
+                    />
+                  </div>
+                </div>
+                )}
           </div>
 
           <div className='grid gap-2 sm:grid-cols-3'>

@@ -4,6 +4,7 @@ import { Building2, CalendarDays, House, LayoutDashboard, LogIn, LogOut, Menu, N
 import { useAppDispatch, useAppSelector } from '../../app/hooks'
 import { clearSession, selectAuth } from '../../features/auth/authSlice'
 import { Button } from '../ui/Button'
+import { useReserveLink } from '../../hooks/useReserveLink'
 
 const rolePath = {
   admin: '/dashboard/admin',
@@ -19,6 +20,7 @@ export function AppHeader () {
   const navigate = useNavigate()
   const [logoImageError, setLogoImageError] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const reserveLink = useReserveLink()
   const identityLabel = auth.role === 'patient'
     ? (auth.patient?.fullName || auth.patient?.dni)
     : auth.user?.email
@@ -90,7 +92,7 @@ export function AppHeader () {
             </NavLink>
           ) : null}
           {!isCurrentPage('/reservar') ? (
-            <NavLink to='/reservar' className={navItemClassName}>
+            <NavLink to={reserveLink} className={navItemClassName}>
               <CalendarDays className='h-5 w-5' />
               Reservar
             </NavLink>
@@ -202,7 +204,7 @@ export function AppHeader () {
                   </NavLink>
                 ) : null}
                 {!isCurrentPage('/reservar') ? (
-                  <NavLink to='/reservar' className={mobileNavItemClassName}>
+                  <NavLink to={reserveLink} className={mobileNavItemClassName}>
                     <CalendarDays className='h-4 w-4' />
                     Reservar
                   </NavLink>
