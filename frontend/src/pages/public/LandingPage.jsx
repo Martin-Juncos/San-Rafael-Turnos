@@ -503,21 +503,21 @@ export function LandingPage () {
         <Card className='overflow-hidden p-0'>
           <div className='grid gap-0 lg:grid-cols-[1.05fr_1fr] lg:items-stretch'>
             <div className='space-y-6 p-6 sm:p-8'>
-              <div className='space-y-4 text-emerald-900/85'>
-                <p className='flex items-start gap-3 text-lg leading-snug'>
-                  <MapPin className='mt-1 h-6 w-6 text-brand-700' />
+              <div className='space-y-3 text-sm text-emerald-900/85'>
+                <p className='flex items-start gap-2.5 leading-snug'>
+                  <MapPin className='mt-0.5 h-5 w-5 text-brand-700' />
                   <span>Espana 930, Goya, Corrientes, Argentina</span>
                 </p>
 
-                <p className='flex items-center gap-3 text-lg'>
-                  <Phone className='h-6 w-6 text-brand-700' />
+                <p className='flex items-center gap-2.5'>
+                  <Phone className='h-5 w-5 text-brand-700' />
                   <a href='tel:+5493777679100' className='hover:text-brand-700'>
                     +54 9 3777 679100
                   </a>
                 </p>
 
-                <p className='flex items-center gap-3 text-lg'>
-                  <Mail className='h-6 w-6 text-brand-700' />
+                <p className='flex items-center gap-2.5'>
+                  <Mail className='h-5 w-5 text-brand-700' />
                   <a
                     href='https://mail.google.com/mail/?view=cm&fs=1&to=prof.mcjuncos@gmail.com&su=Consulta%20-%20Clinica%20San%20Rafael%20Arcangel'
                     target='_blank'
@@ -528,19 +528,19 @@ export function LandingPage () {
                   </a>
                 </p>
 
-                <p className='flex items-center gap-3 text-lg'>
-                  <MessageCircle className='h-6 w-6 text-brand-700' />
+                <p className='flex items-center gap-2.5'>
+                  <MessageCircle className='h-5 w-5 text-brand-700' />
                   <a href='https://wa.me/5493777679100' target='_blank' rel='noreferrer' className='hover:text-brand-700'>
                     WhatsApp: +54 9 3777 679100
                   </a>
                 </p>
 
-                <div className='flex items-start gap-3 text-lg'>
-                  <Clock3 className='mt-1 h-6 w-6 text-brand-700' />
+                <div className='flex items-start gap-2.5'>
+                  <Clock3 className='mt-0.5 h-5 w-5 text-brand-700' />
                   <div className='space-y-1'>
-                    <p className='font-semibold text-emerald-950'>Horario de atencion</p>
-                    <p className='text-base'>Lunes a Viernes: 9:00 - 18:00</p>
-                    <p className='text-base'>Sabados: 9:00 - 13:00</p>
+                    <p className='text-sm font-semibold text-brand-700'>Horario de atencion</p>
+                    <p>Lunes a Viernes: 9:00 - 18:00</p>
+                    <p>Sabados: 9:00 - 13:00</p>
                   </div>
                 </div>
               </div>
