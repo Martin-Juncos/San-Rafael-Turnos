@@ -4,8 +4,39 @@ import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
 import { ActionResultModal } from '../../components/ui/ActionResultModal'
 import { doctorsService, insurancesService, secretariesService, specialtiesService } from '../../api/services'
+import { FiEdit2, FiTrash2 } from 'react-icons/fi'
 
 const dayLabels = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab']
+const parseTimeToMinutes = (value) => {
+  const [hours = '0', minutes = '0'] = String(value).split(':')
+  return Number(hours) * 60 + Number(minutes)
+}
+const formatMinutesToTime = (totalMinutes) => {
+  const safeMinutes = Math.max(0, totalMinutes)
+  const hours = String(Math.floor(safeMinutes / 60)).padStart(2, '0')
+  const minutes = String(safeMinutes % 60).padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+const buildAvailabilitySlots = ({ dayOfWeek, startTime, endTime, slotMinutes, isActive = true }) => {
+  const step = Number(slotMinutes)
+  const start = parseTimeToMinutes(startTime)
+  const end = parseTimeToMinutes(endTime)
+  if (!Number.isFinite(step) || step <= 0 || !Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+    return []
+  }
+
+  const rows = []
+  for (let cursor = start; cursor + step <= end; cursor += step) {
+    rows.push({
+      dayOfWeek: Number(dayOfWeek),
+      startTime: formatMinutesToTime(cursor),
+      endTime: formatMinutesToTime(cursor + step),
+      slotMinutes: step,
+      isActive
+    })
+  }
+  return rows
+}
 
 export function AdminDashboardPage () {
   const [specialties, setSpecialties] = useState([])
@@ -57,6 +88,7 @@ export function AdminDashboardPage () {
     endTime: '13:00',
     slotMinutes: '30'
   })
+  const [editingAvailabilityIndex, setEditingAvailabilityIndex] = useState(-1)
 
   const load = async () => {
     const [specialtyResult, insurancesResult, doctorsResult, secretariesResult] = await Promise.all([
@@ -320,35 +352,88 @@ export function AdminDashboardPage () {
 
   const handleLoadAvailability = async (doctorId) => {
     setAvailabilityDoctorId(doctorId)
+    setEditingAvailabilityIndex(-1)
     if (!doctorId) {
       setAvailabilityDraft([])
       return
     }
     try {
       const data = await doctorsService.getAvailability(doctorId)
-      setAvailabilityDraft(data.availability.map((item) => ({
+      const slotRows = (data.availability || []).flatMap((item) => buildAvailabilitySlots({
         dayOfWeek: item.dayOfWeek,
         startTime: item.startTime.slice(0, 5),
         endTime: item.endTime.slice(0, 5),
-        slotMinutes: item.slotMinutes,
+        slotMinutes: Number(item.slotMinutes) || 30,
         isActive: item.isActive
-      })))
+      }))
+      setAvailabilityDraft(slotRows)
     } catch (apiError) {
       setError(apiError.message)
     }
   }
 
+  const resetAvailabilityForm = () => {
+    setAvailabilityForm({
+      dayOfWeek: '1',
+      startTime: '09:00',
+      endTime: '13:00',
+      slotMinutes: '30'
+    })
+    setEditingAvailabilityIndex(-1)
+  }
+
   const addAvailabilityRow = () => {
-    setAvailabilityDraft((prev) => [
-      ...prev,
-      {
-        dayOfWeek: Number(availabilityForm.dayOfWeek),
-        startTime: availabilityForm.startTime,
-        endTime: availabilityForm.endTime,
-        slotMinutes: Number(availabilityForm.slotMinutes),
-        isActive: true
+    const nextRow = {
+      dayOfWeek: Number(availabilityForm.dayOfWeek),
+      startTime: availabilityForm.startTime,
+      endTime: availabilityForm.endTime,
+      slotMinutes: Number(availabilityForm.slotMinutes),
+      isActive: true
+    }
+
+    const nextRangeSlots = buildAvailabilitySlots(nextRow)
+    if (editingAvailabilityIndex < 0 && nextRangeSlots.length === 0) {
+      setError('Rango invalido. Verifica hora de inicio/fin y duracion de slot.')
+      return
+    }
+
+    setAvailabilityDraft((prev) => {
+      if (editingAvailabilityIndex >= 0) {
+        return prev.map((item, index) => (index === editingAvailabilityIndex ? nextRow : item))
       }
-    ])
+      const merged = [...prev]
+      const existingKeys = new Set(prev.map((item) => `${item.dayOfWeek}-${item.startTime}-${item.endTime}`))
+      for (const slot of nextRangeSlots) {
+        const key = `${slot.dayOfWeek}-${slot.startTime}-${slot.endTime}`
+        if (!existingKeys.has(key)) {
+          merged.push(slot)
+          existingKeys.add(key)
+        }
+      }
+      return merged
+    })
+    resetAvailabilityForm()
+  }
+
+  const handleEditAvailability = (item, index) => {
+    setEditingAvailabilityIndex(index)
+    setAvailabilityForm({
+      dayOfWeek: String(item.dayOfWeek),
+      startTime: item.startTime,
+      endTime: item.endTime,
+      slotMinutes: String(item.slotMinutes)
+    })
+  }
+
+  const handleDeleteAvailability = (indexToDelete) => {
+    setAvailabilityDraft((prev) => prev.filter((_, index) => index !== indexToDelete))
+    if (editingAvailabilityIndex === indexToDelete) {
+      resetAvailabilityForm()
+      return
+    }
+    if (editingAvailabilityIndex > indexToDelete) {
+      setEditingAvailabilityIndex((prev) => prev - 1)
+    }
   }
 
   const saveAvailability = async () => {
@@ -363,6 +448,12 @@ export function AdminDashboardPage () {
       setError(apiError.message)
     }
   }
+
+  const selectedAvailabilityDay = Number(availabilityForm.dayOfWeek)
+  const availabilityForSelectedDay = availabilityDraft
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => item.dayOfWeek === selectedAvailabilityDay)
+    .sort((a, b) => a.item.startTime.localeCompare(b.item.startTime))
 
   return (
     <div className='space-y-6'>
@@ -620,7 +711,13 @@ export function AdminDashboardPage () {
             <select
               className='glass-input'
               value={availabilityForm.dayOfWeek}
-              onChange={(event) => setAvailabilityForm((prev) => ({ ...prev, dayOfWeek: event.target.value }))}
+              onChange={(event) => {
+                const nextDay = event.target.value
+                setAvailabilityForm((prev) => ({ ...prev, dayOfWeek: nextDay }))
+                if (editingAvailabilityIndex >= 0 && String(availabilityDraft[editingAvailabilityIndex]?.dayOfWeek) !== nextDay) {
+                  setEditingAvailabilityIndex(-1)
+                }
+              }}
             >
               {dayLabels.map((label, index) => (
                 <option key={label} value={index}>{label}</option>
@@ -631,14 +728,48 @@ export function AdminDashboardPage () {
           <Input label='Fin' type='time' value={availabilityForm.endTime} onChange={(event) => setAvailabilityForm((prev) => ({ ...prev, endTime: event.target.value }))} />
           <Input label='Slot (min)' type='number' value={availabilityForm.slotMinutes} onChange={(event) => setAvailabilityForm((prev) => ({ ...prev, slotMinutes: event.target.value }))} />
         </div>
-        <div className='flex gap-2'>
-          <Button variant='secondary' onClick={addAvailabilityRow}>Agregar rango</Button>
+        <div className='flex flex-wrap gap-2'>
+          <Button variant='secondary' onClick={addAvailabilityRow}>
+            {editingAvailabilityIndex >= 0 ? 'Guardar cambio de slot' : 'Agregar rango'}
+          </Button>
+          {editingAvailabilityIndex >= 0
+            ? (
+              <Button variant='secondary' onClick={resetAvailabilityForm}>
+                Cancelar edicion de slot
+              </Button>
+              )
+            : null}
           <Button onClick={saveAvailability}>Guardar disponibilidad</Button>
         </div>
-        <div className='grid gap-2 sm:grid-cols-2 lg:grid-cols-3'>
-          {availabilityDraft.map((item, index) => (
-            <div key={`${item.dayOfWeek}-${item.startTime}-${index}`} className='rounded-xl bg-white/70 p-3 text-xs text-emerald-900/80'>
-              {dayLabels[item.dayOfWeek]} {item.startTime} - {item.endTime} ({item.slotMinutes} min)
+        <div className='grid gap-2 sm:grid-cols-2 lg:grid-cols-4'>
+          {availabilityForSelectedDay.map(({ item, index }) => (
+            <div
+              key={`${item.dayOfWeek}-${item.startTime}-${index}`}
+              className={`flex items-center justify-between gap-2 rounded-xl bg-white/70 p-3 text-xs text-emerald-900/80 ${editingAvailabilityIndex === index ? 'ring-2 ring-emerald-500' : ''}`}
+            >
+              <p className='font-medium'>
+                {item.startTime} - {item.endTime}
+              </p>
+              <div className='flex items-center gap-1.5'>
+                <Button
+                  variant='secondary'
+                  className='!h-7 !w-7 !rounded-full !p-0 inline-flex items-center justify-center'
+                  onClick={() => handleEditAvailability(item, index)}
+                  aria-label='Modificar slot'
+                  title='Modificar slot'
+                >
+                  <FiEdit2 size={12} />
+                </Button>
+                <Button
+                  variant='danger'
+                  className='!h-7 !w-7 !rounded-full !p-0 inline-flex items-center justify-center'
+                  onClick={() => handleDeleteAvailability(index)}
+                  aria-label='Eliminar slot'
+                  title='Eliminar slot'
+                >
+                  <FiTrash2 size={12} />
+                </Button>
+              </div>
             </div>
           ))}
         </div>
