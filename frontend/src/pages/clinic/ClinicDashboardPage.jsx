@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { appointmentsService, doctorsService, slotsService, specialtiesService } from '../../api/services'
+import {
+  appointmentsService,
+  doctorsService,
+  patientAuthService,
+  slotsService,
+  specialtiesService
+} from '../../api/services'
 import { Card } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
@@ -36,6 +42,8 @@ const normalizeTimeValue = (value) => {
   return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`
 }
 
+const normalizeDni = (value) => String(value || '').replace(/\D/g, '')
+
 const rangesOverlap = (aStart, aEnd, bStart, bEnd) => {
   const a1 = parseTimeToMinutes(aStart)
   const a2 = parseTimeToMinutes(aEnd)
@@ -50,10 +58,17 @@ export function ClinicDashboardPage () {
   const [doctors, setDoctors] = useState([])
   const [appointments, setAppointments] = useState([])
   const [slots, setSlots] = useState([])
+  const [agendaConfirmedAppointments, setAgendaConfirmedAppointments] = useState([])
+  const [agendaAvailableDates, setAgendaAvailableDates] = useState([])
+  const [agendaAvailabilityLoading, setAgendaAvailabilityLoading] = useState(false)
   const [manualAvailableDates, setManualAvailableDates] = useState([])
   const [manualDateSlots, setManualDateSlots] = useState([])
   const [manualAvailabilityLoading, setManualAvailabilityLoading] = useState(false)
   const [manualSlotsLoading, setManualSlotsLoading] = useState(false)
+  const [manualPatientLookupLoading, setManualPatientLookupLoading] = useState(false)
+  const [manualPatientLookupDone, setManualPatientLookupDone] = useState(false)
+  const [manualPatientExists, setManualPatientExists] = useState(false)
+  const [manualPatientLookupMessage, setManualPatientLookupMessage] = useState('')
   const [rescheduleDoctorId, setRescheduleDoctorId] = useState('')
   const [rescheduleAvailableDates, setRescheduleAvailableDates] = useState([])
   const [rescheduleDateSlots, setRescheduleDateSlots] = useState([])
@@ -92,6 +107,8 @@ export function ClinicDashboardPage () {
     fullName: '',
     dni: '',
     phone: '',
+    streetAndNumber: '',
+    city: '',
     symptoms: ''
   })
   const [rescheduleDraft, setRescheduleDraft] = useState({
@@ -441,28 +458,96 @@ export function ClinicDashboardPage () {
     }
   }, [blockDraft.doctorId])
 
+  const loadAgendaAvailability = useCallback(async (doctorId) => {
+    if (!doctorId) {
+      setAgendaAvailableDates([])
+      return
+    }
+
+    setAgendaAvailabilityLoading(true)
+    setError('')
+    try {
+      const dates = buildUpcomingDates(21)
+      const results = await Promise.all(
+        dates.map(async (date) => {
+          const data = await slotsService.list({ doctorId, date })
+          return { date, count: data.slots.length }
+        })
+      )
+
+      const withAvailability = results.filter((item) => item.count > 0)
+      setAgendaAvailableDates(withAvailability)
+
+      if (withAvailability.length === 0) {
+        setSlots([])
+        return
+      }
+
+      setDoctorFilters((prev) => {
+        const keepDate = withAvailability.some((item) => item.date === prev.date)
+        if (keepDate) return prev
+        return {
+          ...prev,
+          date: withAvailability[0].date
+        }
+      })
+    } catch (apiError) {
+      setError(apiError.message)
+      setAgendaAvailableDates([])
+    } finally {
+      setAgendaAvailabilityLoading(false)
+    }
+  }, [])
+
   const loadSlots = useCallback(async (options = {}) => {
     const doctorId = options.doctorId || appointmentFilters.doctorId
     const date = options.date || doctorFilters.date
 
     if (!date || !doctorId) {
       setSlots([])
+      setAgendaConfirmedAppointments([])
       return
     }
 
     setAgendaLoading(true)
     try {
-      const data = await slotsService.list({
-        doctorId,
-        date
-      })
-      setSlots(data.slots)
+      const [slotsResult, confirmedResult] = await Promise.all([
+        slotsService.list({
+          doctorId,
+          date
+        }),
+        appointmentsService.list({
+          doctorId,
+          dateFrom: date,
+          dateTo: date,
+          status: 'confirmed',
+          pageSize: 100
+        })
+      ])
+
+      setSlots(slotsResult.slots)
+      setAgendaConfirmedAppointments(
+        (confirmedResult.items || []).sort((left, right) => left.startTime.localeCompare(right.startTime))
+      )
     } catch (apiError) {
       setError(apiError.message)
+      setAgendaConfirmedAppointments([])
     } finally {
       setAgendaLoading(false)
     }
   }, [appointmentFilters.doctorId, doctorFilters.date])
+
+  useEffect(() => {
+    if (!appointmentFilters.doctorId) {
+      setAgendaAvailableDates([])
+      setSlots([])
+      setAgendaConfirmedAppointments([])
+      return
+    }
+    setSlots([])
+    setAgendaConfirmedAppointments([])
+    loadAgendaAvailability(appointmentFilters.doctorId).catch(() => {})
+  }, [appointmentFilters.doctorId, loadAgendaAvailability])
 
   useEffect(() => {
     if (!appointmentFilters.doctorId) {
@@ -482,6 +567,11 @@ export function ClinicDashboardPage () {
   const selectedAgendaDoctor = useMemo(() => {
     return doctors.find((item) => item.id === appointmentFilters.doctorId) || null
   }, [doctors, appointmentFilters.doctorId])
+
+  const agendaDaysWithAvailability = useMemo(
+    () => agendaAvailableDates.filter((item) => Number(item.count) > 0),
+    [agendaAvailableDates]
+  )
 
   const rescheduleAppointments = useMemo(() => {
     return appointments.filter((appointment) => {
@@ -597,6 +687,60 @@ export function ClinicDashboardPage () {
     })
   }
 
+  const handleManualPatientDniChange = (value) => {
+    const dni = normalizeDni(value)
+    setManualAppointment((prev) => ({
+      ...prev,
+      dni,
+      fullName: '',
+      phone: '',
+      streetAndNumber: '',
+      city: ''
+    }))
+    setManualPatientLookupDone(false)
+    setManualPatientExists(false)
+    setManualPatientLookupMessage('')
+  }
+
+  const lookupManualPatientByDni = async () => {
+    setError('')
+    setMessage('')
+    setManualPatientLookupMessage('')
+
+    const dni = normalizeDni(manualAppointment.dni)
+    if (dni.length < 6 || dni.length > 12) {
+      setError('Ingresa un DNI valido para continuar.')
+      return
+    }
+
+    setManualPatientLookupLoading(true)
+    try {
+      const result = await patientAuthService.prefillByDni(dni)
+      const exists = Boolean(result?.exists && result?.patient)
+      setManualPatientLookupDone(true)
+      setManualPatientExists(exists)
+      setManualAppointment((prev) => ({
+        ...prev,
+        dni,
+        fullName: exists ? (result.patient.fullName || '') : '',
+        phone: exists ? (result.patient.phone || '') : '',
+        streetAndNumber: exists ? (result.patient.streetAndNumber || '') : '',
+        city: exists ? (result.patient.city || '') : ''
+      }))
+      setManualPatientLookupMessage(
+        exists
+          ? 'Paciente encontrado. Revisa los datos y continua con la creacion del turno.'
+          : 'No encontramos ese DNI. Completa los datos para registrar al paciente.'
+      )
+    } catch (apiError) {
+      setError(apiError.message || 'No se pudo verificar el DNI del paciente.')
+      setManualPatientLookupDone(false)
+      setManualPatientExists(false)
+    } finally {
+      setManualPatientLookupLoading(false)
+    }
+  }
+
   const createManualAppointment = async (event) => {
     event.preventDefault()
     setError('')
@@ -606,9 +750,58 @@ export function ClinicDashboardPage () {
       setError('Selecciona un horario disponible para el medico elegido.')
       return
     }
+    if (!manualPatientLookupDone) {
+      setError('Primero verifica el DNI del paciente.')
+      return
+    }
+
+    const normalizedDni = normalizeDni(manualAppointment.dni)
+    if (normalizedDni.length < 6 || normalizedDni.length > 12) {
+      setError('Ingresa un DNI valido del paciente.')
+      return
+    }
+    if (!manualAppointment.fullName.trim() || manualAppointment.fullName.trim().length < 3) {
+      setError('Completa el nombre del paciente.')
+      return
+    }
+    if (!manualAppointment.phone.trim() || manualAppointment.phone.trim().length < 8) {
+      setError('Completa un telefono valido del paciente.')
+      return
+    }
+    if (!manualPatientExists && (!manualAppointment.streetAndNumber.trim() || manualAppointment.streetAndNumber.trim().length < 3)) {
+      setError('Completa calle y numero del paciente para continuar.')
+      return
+    }
+    if (!manualPatientExists && (!manualAppointment.city.trim() || manualAppointment.city.trim().length < 2)) {
+      setError('Completa la ciudad del paciente para continuar.')
+      return
+    }
+
     try {
-      await appointmentsService.create(manualAppointment)
+      const payload = {
+        ...manualAppointment,
+        fullName: manualAppointment.fullName.trim(),
+        dni: normalizedDni,
+        phone: manualAppointment.phone.trim(),
+        streetAndNumber: manualAppointment.streetAndNumber.trim() || undefined,
+        city: manualAppointment.city.trim() || undefined,
+        symptoms: manualAppointment.symptoms.trim() || undefined
+      }
+      await appointmentsService.create(payload)
       setMessage(`Turno creado para ${manualAppointment.fullName} el ${manualAppointment.date} a las ${manualAppointment.startTime.slice(0, 5)}. Quedo pendiente de pago.`)
+      setManualAppointment((prev) => ({
+        ...prev,
+        startTime: '',
+        fullName: '',
+        dni: '',
+        phone: '',
+        streetAndNumber: '',
+        city: '',
+        symptoms: ''
+      }))
+      setManualPatientLookupDone(false)
+      setManualPatientExists(false)
+      setManualPatientLookupMessage('')
       await loadAppointments()
     } catch (apiError) {
       setError(apiError.message)
@@ -712,44 +905,110 @@ export function ClinicDashboardPage () {
           </div>
           <p className='text-xs text-emerald-900/70'>Mostrando especialidad: {selectedSpecialtyName}</p>
 
-          <div className='grid gap-2 sm:grid-cols-2'>
+          <div className='grid gap-2'>
             {doctors.map((doctor) => (
-              <div key={doctor.id} className='rounded-xl bg-white/70 p-3'>
-                <p className='text-sm font-semibold text-emerald-950'>{doctor.fullName}</p>
-                <p className='text-xs text-emerald-900/70'>{doctor.specialty?.name || 'Sin especialidad'}</p>
-                <button
-                  type='button'
-                  className='mt-2 rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xs'
-                  onClick={() => setAppointmentFilters((prev) => ({ ...prev, doctorId: doctor.id }))}
-                >
-                  Ver agenda
-                </button>
+              <div
+                key={doctor.id}
+                className={`rounded-xl bg-white/70 p-3 ${
+                  appointmentFilters.doctorId === doctor.id ? 'border border-brand-300/70' : ''
+                }`}
+              >
+                <div className='grid gap-3 lg:grid-cols-[220px_1fr] lg:items-start'>
+                  <div className='space-y-2'>
+                    <p className='text-sm font-semibold text-emerald-950'>{doctor.fullName}</p>
+                    <p className='text-xs text-emerald-900/70'>{doctor.specialty?.name || 'Sin especialidad'}</p>
+                    <button
+                      type='button'
+                      className='rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xs'
+                      onClick={() => {
+                        setAppointmentFilters((prev) => ({
+                          ...prev,
+                          doctorId: prev.doctorId === doctor.id ? '' : doctor.id
+                        }))
+                      }}
+                    >
+                      {appointmentFilters.doctorId === doctor.id ? 'Ocultar agenda' : 'Ver agenda'}
+                    </button>
+                  </div>
+
+                  {appointmentFilters.doctorId === doctor.id
+                    ? (
+                      <div className='space-y-3 rounded-xl border border-emerald-200/70 bg-emerald-50/60 p-3'>
+                        <p className='text-xs font-semibold uppercase tracking-wide text-emerald-900/70'>
+                          Dias de atencion (proximos 21 dias)
+                        </p>
+
+                        {agendaAvailabilityLoading
+                          ? <p className='text-xs text-emerald-900/75'>Buscando dias y horarios...</p>
+                          : (
+                              <div className='flex flex-wrap gap-2'>
+                                {agendaDaysWithAvailability.length === 0
+                                  ? <span className='text-xs text-emerald-900/75'>Este medico no tiene agenda cargada en los proximos 21 dias.</span>
+                                  : agendaDaysWithAvailability.map((item) => (
+                                      <button
+                                        key={item.date}
+                                        type='button'
+                                        onClick={() => {
+                                          setDoctorFilters((prev) => ({ ...prev, date: item.date }))
+                                        }}
+                                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                                          doctorFilters.date === item.date
+                                            ? 'border-brand-500 bg-brand-100 text-brand-800'
+                                            : 'border-emerald-200 bg-white/80 text-emerald-900/80 hover:bg-emerald-100'
+                                        }`}
+                                      >
+                                        {formatDateLabel(item.date)} ({item.count})
+                                      </button>
+                                    ))}
+                              </div>
+                            )}
+
+                        <div className='flex flex-wrap items-center gap-2'>
+                          <p className='text-xs text-emerald-900/75'>
+                            Dia seleccionado: {doctorFilters.date ? formatDateLabel(doctorFilters.date) : 'Sin dia'}
+                          </p>
+                        </div>
+
+                        <div className='flex flex-wrap gap-2'>
+                          {slots.map((slot) => (
+                            <span key={slot.startTime} className='rounded-lg bg-white/80 px-3 py-1 text-xs text-emerald-900/85'>
+                              {slot.startTime.slice(0, 5)}
+                            </span>
+                          ))}
+                        </div>
+                        {!agendaLoading && slots.length === 0
+                          ? <p className='text-xs text-amber-700'>No hay horarios disponibles para el dia seleccionado.</p>
+                          : null}
+
+                        <div className='space-y-2'>
+                          <p className='text-xs font-semibold uppercase tracking-wide text-emerald-900/70'>
+                            Turnos confirmados del dia
+                          </p>
+                          <div className='flex flex-wrap gap-2'>
+                            {agendaConfirmedAppointments.map((appointment) => (
+                              <span
+                                key={appointment.id}
+                                className='rounded-lg bg-brand-700 px-3 py-1 text-xs font-semibold text-white'
+                              >
+                                {appointment.startTime.slice(0, 5)} {appointment.patient?.fullName ? `- ${appointment.patient.fullName}` : ''}
+                              </span>
+                            ))}
+                          </div>
+                          {!agendaLoading && agendaConfirmedAppointments.length === 0
+                            ? <p className='text-xs text-emerald-900/70'>No hay turnos confirmados para el dia seleccionado.</p>
+                            : null}
+                        </div>
+                      </div>
+                      )
+                    : null}
+                </div>
               </div>
             ))}
           </div>
-          <Button variant='secondary' onClick={() => loadSlots().catch(() => {})}>
-            Cargar horarios disponibles del medico seleccionado
-          </Button>
+          {doctors.length === 0 ? <p className='text-xs text-emerald-900/70'>No hay medicos para los filtros aplicados.</p> : null}
           {selectedAgendaDoctor
-            ? (
-                <p className='text-xs text-emerald-900/70'>
-                  Agenda de {selectedAgendaDoctor.fullName} para el dia {formatDateLabel(doctorFilters.date)}.
-                </p>
-              )
-            : <p className='text-xs text-emerald-900/70'>Selecciona un medico para ver su agenda.</p>}
-          <div className='flex flex-wrap gap-2'>
-            {slots.map((slot) => (
-              <span key={slot.startTime} className='rounded-lg bg-white/70 px-3 py-1 text-xs text-emerald-900/80'>
-                {slot.startTime.slice(0, 5)}
-              </span>
-            ))}
-          </div>
-          {agendaLoading
-            ? <p className='text-xs text-emerald-900/70'>Buscando horarios disponibles...</p>
-            : null}
-          {!agendaLoading && selectedAgendaDoctor && slots.length === 0
-            ? <p className='text-xs text-amber-700'>No hay horarios disponibles para el dia seleccionado.</p>
-            : null}
+            ? <p className='text-xs text-emerald-900/70'>Agenda seleccionada: {selectedAgendaDoctor.fullName}.</p>
+            : <p className='text-xs text-emerald-900/70'>Selecciona Ver agenda en un medico.</p>}
         </Card>
 
         <Card className='space-y-4'>
@@ -942,12 +1201,82 @@ export function ClinicDashboardPage () {
             {!manualSlotsLoading && manualAppointment.doctorId && manualOpenSlots.length === 0
               ? <p className='text-xs text-amber-700'>No hay horarios disponibles para la fecha elegida.</p>
               : null}
-            <Input label='Paciente' value={manualAppointment.fullName} onChange={(event) => setManualAppointment((prev) => ({ ...prev, fullName: event.target.value }))} />
-            <div className='grid gap-2 sm:grid-cols-2'>
-              <Input label='DNI' value={manualAppointment.dni} onChange={(event) => setManualAppointment((prev) => ({ ...prev, dni: event.target.value }))} />
-              <Input label='Telefono' value={manualAppointment.phone} onChange={(event) => setManualAppointment((prev) => ({ ...prev, phone: event.target.value }))} />
+            <div className='space-y-3 rounded-xl border border-emerald-200/70 bg-white/70 p-3'>
+              <p className='text-xs font-semibold uppercase tracking-wide text-emerald-900/70'>
+                Datos del paciente
+              </p>
+
+              <div className='grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end'>
+                <Input
+                  label='DNI'
+                  value={manualAppointment.dni}
+                  onChange={(event) => handleManualPatientDniChange(event.target.value)}
+                  placeholder='Solo numeros'
+                />
+                <Button
+                  type='button'
+                  variant='secondary'
+                  onClick={lookupManualPatientByDni}
+                  disabled={manualPatientLookupLoading}
+                >
+                  {manualPatientLookupLoading ? 'Verificando...' : 'Verificar DNI'}
+                </Button>
+                <Button
+                  type='button'
+                  variant='secondary'
+                  onClick={() => handleManualPatientDniChange('')}
+                  disabled={!manualAppointment.dni && !manualPatientLookupDone}
+                >
+                  Cambiar DNI
+                </Button>
+              </div>
+
+              {manualPatientLookupMessage
+                ? (
+                  <p className='rounded-xl border border-emerald-200/70 bg-emerald-50/80 px-3 py-2 text-xs text-emerald-900/80'>
+                    {manualPatientLookupMessage}
+                  </p>
+                  )
+                : null}
+
+              {!manualPatientLookupDone
+                ? (
+                  <p className='text-xs text-amber-700'>
+                    Verifica el DNI para autocompletar datos o cargar un paciente nuevo.
+                  </p>
+                  )
+                : (
+                  <div className='grid gap-2 sm:grid-cols-2'>
+                    <Input
+                      label='Paciente'
+                      value={manualAppointment.fullName}
+                      onChange={(event) => setManualAppointment((prev) => ({ ...prev, fullName: event.target.value }))}
+                    />
+                    <Input
+                      label='Telefono'
+                      value={manualAppointment.phone}
+                      onChange={(event) => setManualAppointment((prev) => ({ ...prev, phone: event.target.value }))}
+                    />
+                    <Input
+                      label='Calle y numero'
+                      value={manualAppointment.streetAndNumber}
+                      onChange={(event) => setManualAppointment((prev) => ({ ...prev, streetAndNumber: event.target.value }))}
+                    />
+                    <Input
+                      label='Ciudad'
+                      value={manualAppointment.city}
+                      onChange={(event) => setManualAppointment((prev) => ({ ...prev, city: event.target.value }))}
+                    />
+                    <div className='sm:col-span-2'>
+                      <Input
+                        label='Sintomas / motivo'
+                        value={manualAppointment.symptoms}
+                        onChange={(event) => setManualAppointment((prev) => ({ ...prev, symptoms: event.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  )}
             </div>
-            <Input label='Sintomas / motivo' value={manualAppointment.symptoms} onChange={(event) => setManualAppointment((prev) => ({ ...prev, symptoms: event.target.value }))} />
             <Button type='submit' disabled={!manualAppointment.doctorId || !manualAppointment.startTime || manualOpenSlots.length === 0}>
               Crear turno
             </Button>
@@ -1105,7 +1434,14 @@ export function ClinicDashboardPage () {
         </div>
         <div className='space-y-2'>
           {appointments.map((appointment) => (
-            <div key={appointment.id} className='rounded-xl bg-white/70 p-3 text-sm'>
+            <div
+              key={appointment.id}
+              className={`rounded-xl p-3 text-sm ${
+                appointment.status === 'confirmed'
+                  ? 'border border-brand-400/70 bg-brand-700/20'
+                  : 'bg-white/70'
+              }`}
+            >
               <div className='flex flex-wrap items-center justify-between gap-2'>
                 <div>
                   <p className='font-semibold text-emerald-950'>
