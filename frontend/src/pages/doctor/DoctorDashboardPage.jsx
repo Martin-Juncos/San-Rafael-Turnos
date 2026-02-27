@@ -511,6 +511,10 @@ export function DoctorDashboardPage () {
     navigate(`/reservar?${params.toString()}`)
   }
 
+  const openPatientRecords = () => {
+    navigate('/dashboard/medico/registros-pacientes')
+  }
+
   const openConsultRecord = (appointment) => {
     if (!appointment?.id) return
 
@@ -545,7 +549,14 @@ export function DoctorDashboardPage () {
               Agenda diaria/semanal, estado de atencion y mensajeria por turno confirmado.
             </p>
           </div>
-          <div className='flex justify-start md:justify-end'>
+          <div className='flex flex-wrap justify-start gap-2 md:justify-end'>
+            <Button
+              variant='secondary'
+              onClick={openPatientRecords}
+              className='px-6 py-3 text-base'
+            >
+              Ver registros de pacientes
+            </Button>
             <Button
               onClick={openReserveWithPrefill}
               disabled={!auth.user?.doctorId}

@@ -17,6 +17,8 @@ import { ClinicDashboardPage } from './pages/clinic/ClinicDashboardPage'
 import { DoctorDashboardPage } from './pages/doctor/DoctorDashboardPage'
 import { DoctorPrintDayPage } from './pages/doctor/DoctorPrintDayPage'
 import { DoctorConsultNotePage } from './pages/doctor/DoctorConsultNotePage'
+import { DoctorPatientsRecordsPage } from './pages/doctor/DoctorPatientsRecordsPage'
+import { DoctorPatientRecordsDetailPage } from './pages/doctor/DoctorPatientRecordsDetailPage'
 import { PatientDashboardPage } from './pages/patient/PatientDashboardPage'
 import { ReservePage } from './pages/patient/ReservePage'
 import { NotFoundPage } from './pages/public/NotFoundPage'
@@ -82,6 +84,22 @@ function App () {
             element={
               <ProtectedRoute allowedRoles={['doctor']}>
                 <DoctorConsultNotePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path='/dashboard/medico/registros-pacientes'
+            element={
+              <ProtectedRoute allowedRoles={['doctor']}>
+                <DoctorPatientsRecordsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path='/dashboard/medico/registros-pacientes/:patientId'
+            element={
+              <ProtectedRoute allowedRoles={['doctor']}>
+                <DoctorPatientRecordsDetailPage />
               </ProtectedRoute>
             }
           />
