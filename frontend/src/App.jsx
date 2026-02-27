@@ -16,6 +16,7 @@ import { AdminDashboardPage } from './pages/admin/AdminDashboardPage'
 import { ClinicDashboardPage } from './pages/clinic/ClinicDashboardPage'
 import { DoctorDashboardPage } from './pages/doctor/DoctorDashboardPage'
 import { DoctorPrintDayPage } from './pages/doctor/DoctorPrintDayPage'
+import { DoctorConsultNotePage } from './pages/doctor/DoctorConsultNotePage'
 import { PatientDashboardPage } from './pages/patient/PatientDashboardPage'
 import { ReservePage } from './pages/patient/ReservePage'
 import { NotFoundPage } from './pages/public/NotFoundPage'
@@ -73,6 +74,14 @@ function App () {
             element={
               <ProtectedRoute allowedRoles={['doctor']}>
                 <DoctorPrintDayPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path='/dashboard/medico/consulta/:appointmentId'
+            element={
+              <ProtectedRoute allowedRoles={['doctor']}>
+                <DoctorConsultNotePage />
               </ProtectedRoute>
             }
           />

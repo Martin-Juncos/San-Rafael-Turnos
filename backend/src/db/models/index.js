@@ -12,6 +12,7 @@ import { initAppointmentModel, Appointment } from './Appointment.js'
 import { initPaymentModel, Payment } from './Payment.js'
 import { initMessageModel, Message } from './Message.js'
 import { initAuditLogModel, AuditLog } from './AuditLog.js'
+import { initConsultNoteModel, ConsultNote } from './ConsultNote.js'
 
 let initialized = false
 
@@ -33,6 +34,7 @@ export const initModels = () => {
   initPaymentModel(sequelize)
   initMessageModel(sequelize)
   initAuditLogModel(sequelize)
+  initConsultNoteModel(sequelize)
 
   Specialty.hasMany(Doctor, { foreignKey: 'specialtyId', as: 'doctors' })
   Doctor.belongsTo(Specialty, { foreignKey: 'specialtyId', as: 'specialty' })
@@ -61,6 +63,15 @@ export const initModels = () => {
   Appointment.hasMany(Message, { foreignKey: 'appointmentId', as: 'messages' })
   Message.belongsTo(Appointment, { foreignKey: 'appointmentId', as: 'appointment' })
 
+  Appointment.hasOne(ConsultNote, { foreignKey: 'appointmentId', as: 'consultNote' })
+  ConsultNote.belongsTo(Appointment, { foreignKey: 'appointmentId', as: 'appointment' })
+
+  Doctor.hasMany(ConsultNote, { foreignKey: 'doctorId', as: 'consultNotes' })
+  ConsultNote.belongsTo(Doctor, { foreignKey: 'doctorId', as: 'doctor' })
+
+  Patient.hasMany(ConsultNote, { foreignKey: 'patientId', as: 'consultNotes' })
+  ConsultNote.belongsTo(Patient, { foreignKey: 'patientId', as: 'patient' })
+
   User.belongsTo(Doctor, { foreignKey: 'doctorId', as: 'doctor' })
   Doctor.hasOne(User, { foreignKey: 'doctorId', as: 'user' })
 
@@ -86,5 +97,6 @@ export {
   Appointment,
   Payment,
   Message,
-  AuditLog
+  AuditLog,
+  ConsultNote
 }

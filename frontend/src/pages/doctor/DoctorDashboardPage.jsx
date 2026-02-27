@@ -511,6 +511,18 @@ export function DoctorDashboardPage () {
     navigate(`/reservar?${params.toString()}`)
   }
 
+  const openConsultRecord = (appointment) => {
+    if (!appointment?.id) return
+
+    if (appointment.status === 'cancelled') {
+      const statusLabel = APPOINTMENT_STATUS_LABELS[appointment.status] || appointment.status
+      setError(`No se puede abrir el registro de consulta porque el turno esta en estado "${statusLabel}".`)
+      return
+    }
+
+    navigate(`/dashboard/medico/consulta/${appointment.id}`)
+  }
+
   const sendMessage = async (event) => {
     event.preventDefault()
     if (!selectedAppointmentId || !chatDraft.trim()) return
@@ -613,16 +625,25 @@ export function DoctorDashboardPage () {
                       ? <p className='text-xs font-semibold text-amber-800'>Nuevo mensaje</p>
                       : null}
                   </div>
-                  <button
-                    type='button'
-                    className='rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xs'
-                    onClick={() => {
-                      setSelectedAppointmentId(appointment.id)
-                      markConversationRead(appointment.id)
-                    }}
-                  >
-                    Gestionar
-                  </button>
+                  <div className='flex flex-wrap justify-end gap-1.5'>
+                    <button
+                      type='button'
+                      className='rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xs'
+                      onClick={() => {
+                        setSelectedAppointmentId(appointment.id)
+                        markConversationRead(appointment.id)
+                      }}
+                    >
+                      Gestionar
+                    </button>
+                    <button
+                      type='button'
+                      className='rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xs'
+                      onClick={() => openConsultRecord(appointment)}
+                    >
+                      Registro de consulta
+                    </button>
+                  </div>
                 </div>
                 <div className='mt-2 flex flex-wrap gap-2'>
                   <Button

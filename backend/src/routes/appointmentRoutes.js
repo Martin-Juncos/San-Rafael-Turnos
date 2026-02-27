@@ -26,6 +26,14 @@ import {
   appointmentMessagesSchema,
   postMessageSchema
 } from '../controllers/messageController.js'
+import {
+  consultNoteIdSchema,
+  createConsultNoteSchema,
+  patchConsultNoteSchema,
+  getConsultNoteByAppointment,
+  createConsultNoteByAppointment,
+  patchConsultNoteByAppointment
+} from '../controllers/consultNoteController.js'
 
 const router = Router()
 
@@ -42,6 +50,9 @@ router.post(
   validate(rescheduleAppointmentSchema),
   asyncHandler(rescheduleAppointment)
 )
+router.get('/:id/consult-note', authenticateJwt, validate(consultNoteIdSchema), asyncHandler(getConsultNoteByAppointment))
+router.post('/:id/consult-note', authenticateJwt, validate(createConsultNoteSchema), asyncHandler(createConsultNoteByAppointment))
+router.patch('/:id/consult-note', authenticateJwt, validate(patchConsultNoteSchema), asyncHandler(patchConsultNoteByAppointment))
 router.get('/:id/messages', messagesLimiter, authenticateJwt, validate(appointmentMessagesSchema), asyncHandler(getMessagesByAppointment))
 router.post('/:id/messages', messagesLimiter, authenticateJwt, validate(postMessageSchema), asyncHandler(postMessageByAppointment))
 

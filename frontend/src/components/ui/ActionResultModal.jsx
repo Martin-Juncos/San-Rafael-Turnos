@@ -23,7 +23,8 @@ export function ActionResultModal ({
   title,
   description,
   confirmLabel = 'Entendido',
-  onClose
+  onClose,
+  onConfirm
 }) {
   useEffect(() => {
     if (!open) return
@@ -72,7 +73,7 @@ export function ActionResultModal ({
         </div>
 
         <div className='flex justify-end'>
-          <Button onClick={() => onClose?.()}>{confirmLabel}</Button>
+          <Button onClick={() => (onConfirm || onClose)?.()}>{confirmLabel}</Button>
         </div>
       </section>
     </div>
