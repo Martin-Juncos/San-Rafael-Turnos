@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppHeader } from './components/layout/AppHeader'
 import { AppFooter } from './components/layout/AppFooter'
+import { FloatingWhatsAppButton } from './components/layout/FloatingWhatsAppButton'
 import { ProtectedRoute } from './components/layout/ProtectedRoute'
 import { LandingPage } from './pages/public/LandingPage'
 import { SpecialtiesPage } from './pages/public/SpecialtiesPage'
@@ -88,6 +89,7 @@ function App () {
           <Route path='*' element={<NotFoundPage />} />
         </Routes>
       </main>
+      <FloatingWhatsAppButton />
       <AppFooter />
     </div>
   )
