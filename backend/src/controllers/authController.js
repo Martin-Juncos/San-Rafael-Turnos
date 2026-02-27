@@ -30,7 +30,11 @@ export const logoutSchema = refreshSchema
 const sanitizeUser = (user) => ({
   id: user.id,
   role: user.role,
+  accountType: user.accountType,
   email: user.email,
+  fullName: user.fullName,
+  phone: user.phone,
+  dni: user.dni,
   doctorId: user.doctorId,
   isActive: user.isActive
 })

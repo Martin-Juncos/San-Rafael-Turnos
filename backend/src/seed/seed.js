@@ -9,19 +9,41 @@ import {
 } from '../db/models/index.js'
 import { logger } from '../config/logger.js'
 
-const upsertUser = async ({ role, email, password, doctorId = null }) => {
+const upsertUser = async ({
+  role,
+  email,
+  password,
+  doctorId = null,
+  accountType = 'staff',
+  fullName = null,
+  phone = null,
+  dni = null
+}) => {
   const hash = await bcrypt.hash(password, 10)
   const [user] = await User.findOrCreate({
     where: { email },
     defaults: {
       role,
+      accountType,
       email,
       passwordHash: hash,
       doctorId,
+      fullName,
+      phone,
+      dni,
       isActive: true
     }
   })
-  await user.update({ role, passwordHash: hash, doctorId, isActive: true })
+  await user.update({
+    role,
+    accountType,
+    passwordHash: hash,
+    doctorId,
+    fullName,
+    phone,
+    dni,
+    isActive: true
+  })
   return user
 }
 
@@ -101,9 +123,18 @@ const run = async () => {
       ])
     }
 
-    await upsertUser({ role: 'admin', email: 'admin@mail.com', password: 'admin' })
-    await upsertUser({ role: 'clinic', email: 'clinica@mail.com', password: 'clinica' })
-    await upsertUser({ role: 'doctor', email: 'medico@mail.com', password: doctor.dni, doctorId: doctor.id })
+    await upsertUser({ role: 'admin', email: 'admin@mail.com', password: 'admin', accountType: 'staff' })
+    await upsertUser({ role: 'clinic', email: 'clinica@mail.com', password: 'clinica', accountType: 'staff' })
+    await upsertUser({
+      role: 'doctor',
+      email: 'medico@mail.com',
+      password: doctor.dni,
+      doctorId: doctor.id,
+      accountType: 'doctor',
+      fullName: doctor.fullName,
+      phone: doctor.phone,
+      dni: doctor.dni
+    })
 
     logger.info('Seed completado')
     process.exit(0)

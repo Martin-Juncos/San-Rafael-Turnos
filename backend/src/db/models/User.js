@@ -14,6 +14,11 @@ export const initUserModel = (sequelize) => {
         type: DataTypes.ENUM('admin', 'clinic', 'doctor'),
         allowNull: false
       },
+      accountType: {
+        type: DataTypes.ENUM('staff', 'doctor', 'secretary'),
+        allowNull: false,
+        defaultValue: 'staff'
+      },
       email: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -28,6 +33,18 @@ export const initUserModel = (sequelize) => {
         type: DataTypes.UUID,
         allowNull: true
       },
+      fullName: {
+        type: DataTypes.STRING,
+        allowNull: true
+      },
+      phone: {
+        type: DataTypes.STRING,
+        allowNull: true
+      },
+      dni: {
+        type: DataTypes.STRING,
+        allowNull: true
+      },
       isActive: {
         type: DataTypes.BOOLEAN,
         allowNull: false,
@@ -37,7 +54,15 @@ export const initUserModel = (sequelize) => {
     {
       sequelize,
       modelName: 'User',
-      tableName: 'User'
+      tableName: 'User',
+      indexes: [
+        {
+          fields: ['role', 'accountType']
+        },
+        {
+          fields: ['doctorId']
+        }
+      ]
     }
   )
 

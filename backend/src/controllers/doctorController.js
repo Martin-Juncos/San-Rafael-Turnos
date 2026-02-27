@@ -208,9 +208,13 @@ export const createDoctor = async (req, res) => {
       await User.create(
         {
           role: 'doctor',
+          accountType: 'doctor',
           email: payload.email,
           passwordHash,
           doctorId: doctor.id,
+          fullName: payload.fullName,
+          phone: payload.phone,
+          dni: payload.dni,
           isActive: payload.isActive ?? true
         },
         { transaction }
@@ -257,7 +261,8 @@ export const updateDoctor = async (req, res) => {
       const doctorUser = await User.findOne({
         where: {
           doctorId: doctor.id,
-          role: 'doctor'
+          role: 'doctor',
+          accountType: 'doctor'
         },
         transaction
       })
@@ -265,6 +270,9 @@ export const updateDoctor = async (req, res) => {
       if (doctorUser) {
         const userPatch = {}
         if (patch.email) userPatch.email = patch.email
+        if (patch.fullName) userPatch.fullName = patch.fullName
+        if (patch.phone) userPatch.phone = patch.phone
+        if (patch.dni) userPatch.dni = patch.dni
         if (typeof patch.isActive === 'boolean') userPatch.isActive = patch.isActive
         if (patch.dni) {
           userPatch.passwordHash = await bcrypt.hash(patch.dni, 10)

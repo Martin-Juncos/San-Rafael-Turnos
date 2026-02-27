@@ -10,6 +10,7 @@ import paymentRoutes from './paymentRoutes.js'
 import notificationRoutes from './notificationRoutes.js'
 import auditRoutes from './auditRoutes.js'
 import newsRoutes from './newsRoutes.js'
+import secretaryRoutes from './secretaryRoutes.js'
 
 const router = Router()
 
@@ -24,5 +25,6 @@ router.use('/payments', paymentRoutes)
 router.use('/notifications', notificationRoutes)
 router.use('/audit-logs', auditRoutes)
 router.use('/news', newsRoutes)
+router.use('/secretaries', secretaryRoutes)
 
 export default router

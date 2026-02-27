@@ -3,7 +3,7 @@ import { Card } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
 import { ActionResultModal } from '../../components/ui/ActionResultModal'
-import { doctorsService, insurancesService, specialtiesService } from '../../api/services'
+import { doctorsService, insurancesService, secretariesService, specialtiesService } from '../../api/services'
 
 const dayLabels = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab']
 
@@ -11,6 +11,7 @@ export function AdminDashboardPage () {
   const [specialties, setSpecialties] = useState([])
   const [insurances, setInsurances] = useState([])
   const [doctors, setDoctors] = useState([])
+  const [secretaries, setSecretaries] = useState([])
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [feedbackModal, setFeedbackModal] = useState({
@@ -38,6 +39,13 @@ export function AdminDashboardPage () {
     consultorio: '',
     specialtyId: ''
   })
+  const [secretaryForm, setSecretaryForm] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    dni: '',
+    doctorId: ''
+  })
 
   const [availabilityDoctorId, setAvailabilityDoctorId] = useState('')
   const [availabilityDraft, setAvailabilityDraft] = useState([])
@@ -49,14 +57,16 @@ export function AdminDashboardPage () {
   })
 
   const load = async () => {
-    const [specialtyResult, insurancesResult, doctorsResult] = await Promise.all([
+    const [specialtyResult, insurancesResult, doctorsResult, secretariesResult] = await Promise.all([
       specialtiesService.list({ pageSize: 100, isActive: 'true' }),
       insurancesService.list({ pageSize: 100 }),
-      doctorsService.list({ pageSize: 100 })
+      doctorsService.list({ pageSize: 100 }),
+      secretariesService.list({ pageSize: 100 })
     ])
     setSpecialties(specialtyResult.items)
     setInsurances(insurancesResult.items)
     setDoctors(doctorsResult.items)
+    setSecretaries(secretariesResult.items)
   }
 
   useEffect(() => {
@@ -140,6 +150,36 @@ export function AdminDashboardPage () {
     }
   }
 
+  const handleCreateSecretary = async (event) => {
+    event.preventDefault()
+    setError('')
+    setMessage('')
+    const secretaryName = secretaryForm.fullName.trim()
+    const secretaryEmail = secretaryForm.email.trim()
+    const secretaryDni = secretaryForm.dni.replace(/\D/g, '')
+
+    try {
+      await secretariesService.create({
+        fullName: secretaryName,
+        email: secretaryEmail,
+        phone: secretaryForm.phone.trim(),
+        dni: secretaryDni,
+        doctorId: secretaryForm.doctorId
+      })
+      setSecretaryForm({
+        fullName: '',
+        email: '',
+        phone: '',
+        dni: '',
+        doctorId: ''
+      })
+      await load()
+      setMessage(`Se creo la secretaria ${secretaryName}. Credenciales iniciales: ${secretaryEmail} + DNI.`)
+    } catch (apiError) {
+      setError(apiError.message)
+    }
+  }
+
   const handleCreateInsurance = async (event) => {
     event.preventDefault()
     setError('')
@@ -192,6 +232,19 @@ export function AdminDashboardPage () {
       await doctorsService.remove(id)
       await load()
       setMessage(`Se elimino el medico "${doctorName || 'seleccionado'}".`)
+    } catch (apiError) {
+      setError(apiError.message)
+    }
+  }
+
+  const handleDeleteSecretary = async (id) => {
+    setError('')
+    setMessage('')
+    const secretaryName = secretaries.find((item) => item.id === id)?.fullName || secretaries.find((item) => item.id === id)?.email
+    try {
+      await secretariesService.remove(id)
+      await load()
+      setMessage(`Se elimino la secretaria "${secretaryName || 'seleccionada'}".`)
     } catch (apiError) {
       setError(apiError.message)
     }
@@ -389,6 +442,65 @@ export function AdminDashboardPage () {
                 </Button>
               </div>
             ))}
+          </div>
+        </Card>
+
+        <Card className='space-y-4'>
+          <h2 className='text-lg font-semibold text-emerald-950'>Secretaria</h2>
+          <form className='grid gap-2 sm:grid-cols-2' onSubmit={handleCreateSecretary}>
+            <Input
+              label='Nombre'
+              value={secretaryForm.fullName}
+              onChange={(event) => setSecretaryForm((prev) => ({ ...prev, fullName: event.target.value }))}
+            />
+            <Input
+              label='Correo'
+              type='email'
+              value={secretaryForm.email}
+              onChange={(event) => setSecretaryForm((prev) => ({ ...prev, email: event.target.value }))}
+            />
+            <Input
+              label='Telefono'
+              value={secretaryForm.phone}
+              onChange={(event) => setSecretaryForm((prev) => ({ ...prev, phone: event.target.value }))}
+            />
+            <Input
+              label='DNI (clave inicial)'
+              value={secretaryForm.dni}
+              onChange={(event) => setSecretaryForm((prev) => ({ ...prev, dni: event.target.value.replace(/\D/g, '') }))}
+            />
+            <label className='space-y-1 sm:col-span-2'>
+              <span className='text-xs text-emerald-900/75'>Medico vinculado</span>
+              <select
+                className='glass-input'
+                value={secretaryForm.doctorId}
+                onChange={(event) => setSecretaryForm((prev) => ({ ...prev, doctorId: event.target.value }))}
+              >
+                <option value=''>Seleccionar</option>
+                {doctors.map((doctor) => (
+                  <option key={doctor.id} value={doctor.id}>{doctor.fullName}</option>
+                ))}
+              </select>
+            </label>
+            <Button type='submit' className='sm:col-span-2'>Crear secretaria</Button>
+          </form>
+
+          <div className='space-y-2'>
+            {secretaries.map((secretary) => (
+              <div key={secretary.id} className='flex items-center justify-between rounded-xl bg-white/70 p-3 text-sm'>
+                <div>
+                  <p className='font-semibold text-emerald-950'>{secretary.fullName || secretary.email}</p>
+                  <p className='text-xs text-emerald-900/70'>{secretary.email}</p>
+                  <p className='text-xs text-emerald-900/70'>Telefono: {secretary.phone || '-'}</p>
+                  <p className='text-xs text-emerald-900/70'>DNI: {secretary.dni || '-'}</p>
+                  <p className='text-xs text-emerald-900/70'>Medico: {secretary.doctor?.fullName || '-'}</p>
+                </div>
+                <Button variant='danger' className='px-3 py-1.5 text-xs' onClick={() => handleDeleteSecretary(secretary.id)}>
+                  Eliminar
+                </Button>
+              </div>
+            ))}
+            {secretaries.length === 0 ? <p className='text-sm text-emerald-900/75'>No hay secretarias cargadas.</p> : null}
           </div>
         </Card>
       </div>
