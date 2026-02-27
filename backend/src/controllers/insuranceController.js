@@ -5,6 +5,8 @@ import { AppError } from '../utils/errors.js'
 import { ok, paginated } from '../utils/response.js'
 import { parsePagination, buildPagination } from '../utils/pagination.js'
 import { writeAuditLog } from '../utils/audit.js'
+import { logger } from '../config/logger.js'
+import { ensureHealthInsuranceUniquenessRule } from '../db/healthInsuranceConstraints.js'
 
 const normalizeInsuranceName = (value) => String(value ?? '').trim().replace(/\s+/g, ' ')
 let insuranceUniquenessEnsured = false
@@ -14,22 +16,7 @@ const ensureInsuranceUniquenessRule = async () => {
     return
   }
 
-  await sequelize.query(`
-    ALTER TABLE "HealthInsurance"
-    DROP CONSTRAINT IF EXISTS "HealthInsurance_name_key";
-  `)
-  await sequelize.query(`
-    DROP INDEX IF EXISTS "healthinsurance_name_key";
-  `)
-  await sequelize.query(`
-    DROP INDEX IF EXISTS "healthinsurance_unique_name_discount_active";
-  `)
-  await sequelize.query(`
-    CREATE UNIQUE INDEX IF NOT EXISTS "healthinsurance_unique_name_discount_active"
-    ON "HealthInsurance" (LOWER("name"), "discountPercent")
-    WHERE "deletedAt" IS NULL;
-  `)
-
+  await ensureHealthInsuranceUniquenessRule(sequelize)
   insuranceUniquenessEnsured = true
 }
 
@@ -102,7 +89,9 @@ export const listInsurances = async (req, res) => {
 export const createInsurance = async (req, res) => {
   try {
     await ensureInsuranceUniquenessRule()
-  } catch (_error) {}
+  } catch (error) {
+    logger.warn({ err: error }, 'insurance-uniqueness-rule-not-applied')
+  }
 
   const payload = {
     ...req.validated.body,
@@ -169,7 +158,9 @@ export const createInsurance = async (req, res) => {
 export const updateInsurance = async (req, res) => {
   try {
     await ensureInsuranceUniquenessRule()
-  } catch (_error) {}
+  } catch (error) {
+    logger.warn({ err: error }, 'insurance-uniqueness-rule-not-applied')
+  }
 
   const item = await HealthInsurance.findByPk(req.validated.params.id)
   if (!item) {

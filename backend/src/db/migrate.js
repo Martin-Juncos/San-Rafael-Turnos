@@ -1,23 +1,13 @@
 import { sequelize } from '../config/database.js'
 import { logger } from '../config/logger.js'
 import '../db/models/index.js'
+import { ensureHealthInsuranceUniquenessRule } from './healthInsuranceConstraints.js'
 
 const run = async () => {
   try {
     await sequelize.authenticate()
     await sequelize.sync({ alter: true })
-    await sequelize.query(`
-      ALTER TABLE "HealthInsurance"
-      DROP CONSTRAINT IF EXISTS "HealthInsurance_name_key";
-    `)
-    await sequelize.query(`
-      DROP INDEX IF EXISTS "healthinsurance_unique_name_discount_active";
-    `)
-    await sequelize.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS "healthinsurance_unique_name_discount_active"
-      ON "HealthInsurance" (LOWER("name"), "discountPercent")
-      WHERE "deletedAt" IS NULL;
-    `)
+    await ensureHealthInsuranceUniquenessRule(sequelize)
     await sequelize.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS appointment_unique_active_slot
       ON "Appointment" ("doctorId", "date", "startTime")

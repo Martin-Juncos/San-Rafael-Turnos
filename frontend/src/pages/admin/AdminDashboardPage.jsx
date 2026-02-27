@@ -4,7 +4,7 @@ import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
 import { ActionResultModal } from '../../components/ui/ActionResultModal'
 import { doctorsService, insurancesService, secretariesService, specialtiesService } from '../../api/services'
-import { FiEdit2, FiTrash2 } from 'react-icons/fi'
+import { FiEdit2, FiPower, FiTrash2 } from 'react-icons/fi'
 
 const dayLabels = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab']
 const parseTimeToMinutes = (value) => {
@@ -62,6 +62,7 @@ export function AdminDashboardPage () {
     name: '',
     discountPercent: 0
   })
+  const [editingInsuranceId, setEditingInsuranceId] = useState('')
   const [doctorForm, setDoctorForm] = useState({
     fullName: '',
     email: '',
@@ -238,20 +239,33 @@ export function AdminDashboardPage () {
     }
   }
 
-  const handleCreateInsurance = async (event) => {
+  const resetInsuranceForm = () => {
+    setInsuranceForm({ name: '', discountPercent: 0 })
+    setEditingInsuranceId('')
+  }
+
+  const handleSubmitInsurance = async (event) => {
     event.preventDefault()
     setError('')
     setMessage('')
     const insuranceName = insuranceForm.name.trim()
     const discountPercent = Number(insuranceForm.discountPercent)
     try {
-      await insurancesService.create({
-        name: insuranceName,
-        discountPercent
-      })
-      setInsuranceForm({ name: '', discountPercent: 0 })
+      if (editingInsuranceId) {
+        await insurancesService.update(editingInsuranceId, {
+          name: insuranceName,
+          discountPercent
+        })
+        setMessage(`Obra social "${insuranceName}" actualizada con descuento ${discountPercent}%.`)
+      } else {
+        await insurancesService.create({
+          name: insuranceName,
+          discountPercent
+        })
+        setMessage(`Obra social "${insuranceName}" guardada con descuento ${discountPercent}%.`)
+      }
+      resetInsuranceForm()
       await load()
-      setMessage(`Obra social "${insuranceName}" guardada con descuento ${discountPercent}%.`)
     } catch (apiError) {
       setError(apiError.message)
     }
@@ -343,8 +357,32 @@ export function AdminDashboardPage () {
     const insuranceName = insurances.find((item) => item.id === id)?.name
     try {
       await insurancesService.remove(id)
+      if (editingInsuranceId === id) {
+        resetInsuranceForm()
+      }
       await load()
       setMessage(`Se elimino la obra social "${insuranceName || 'seleccionada'}".`)
+    } catch (apiError) {
+      setError(apiError.message)
+    }
+  }
+
+  const handleEditInsurance = (insurance) => {
+    setEditingInsuranceId(insurance.id)
+    setInsuranceForm({
+      name: insurance.name || '',
+      discountPercent: Number(insurance.discountPercent || 0)
+    })
+  }
+
+  const handleToggleInsuranceStatus = async (insurance) => {
+    setError('')
+    setMessage('')
+    const nextIsActive = !insurance.isActive
+    try {
+      await insurancesService.update(insurance.id, { isActive: nextIsActive })
+      await load()
+      setMessage(`Obra social "${insurance.name}" ${nextIsActive ? 'activada' : 'desactivada'}.`)
     } catch (apiError) {
       setError(apiError.message)
     }
@@ -776,8 +814,13 @@ export function AdminDashboardPage () {
       </Card>
 
       <Card className='space-y-4'>
-        <h2 className='text-lg font-semibold text-emerald-950'>Obras sociales</h2>
-        <form className='grid gap-2 sm:grid-cols-3' onSubmit={handleCreateInsurance}>
+        <div className='space-y-1'>
+          <h2 className='text-lg font-semibold text-emerald-950'>Obras sociales</h2>
+          <p className='text-xs text-emerald-900/70'>
+            {editingInsuranceId ? 'Editando obra social seleccionada.' : 'Gestiona nombre y porcentaje de descuento.'}
+          </p>
+        </div>
+        <form className='grid gap-2 sm:grid-cols-3' onSubmit={handleSubmitInsurance}>
           <Input
             label='Nombre'
             value={insuranceForm.name}
@@ -792,20 +835,57 @@ export function AdminDashboardPage () {
             value={insuranceForm.discountPercent}
             onChange={(event) => setInsuranceForm((prev) => ({ ...prev, discountPercent: event.target.value }))}
           />
-          <Button type='submit' className='self-end'>Crear obra social</Button>
+          <div className='self-end flex flex-wrap gap-2 sm:justify-end'>
+            <Button type='submit'>
+              {editingInsuranceId ? 'Guardar cambios' : 'Crear obra social'}
+            </Button>
+            {editingInsuranceId
+              ? (
+                <Button type='button' variant='secondary' onClick={resetInsuranceForm}>
+                  Cancelar
+                </Button>
+                )
+              : null}
+          </div>
         </form>
 
-        <div className='space-y-2'>
+        <div className='grid gap-2 sm:grid-cols-2 lg:grid-cols-4'>
           {insurances.map((insurance) => (
-            <div key={insurance.id} className='flex items-center justify-between rounded-xl bg-white/70 p-3 text-sm'>
+            <div key={insurance.id} className='flex items-center justify-between gap-2 rounded-xl bg-white/70 p-3 text-sm'>
               <div>
-                <p className='font-semibold text-emerald-950'>{insurance.name}</p>
+                <p className={`font-semibold text-emerald-950 ${insurance.isActive ? '' : 'line-through opacity-70'}`}>{insurance.name}</p>
                 <p className='text-xs text-emerald-900/70'>Descuento: {insurance.discountPercent}%</p>
                 <p className='text-xs text-emerald-900/70'>Estado: {insurance.isActive ? 'Activa' : 'Inactiva'}</p>
               </div>
-              <Button variant='danger' className='px-3 py-1.5 text-xs' onClick={() => handleDeleteInsurance(insurance.id)}>
-                Eliminar
-              </Button>
+              <div className='flex items-center gap-1.5'>
+                <Button
+                  variant='secondary'
+                  className='!h-8 !w-8 !rounded-full !p-0 inline-flex items-center justify-center'
+                  onClick={() => handleToggleInsuranceStatus(insurance)}
+                  aria-label={insurance.isActive ? 'Desactivar obra social' : 'Activar obra social'}
+                  title={insurance.isActive ? 'Desactivar obra social' : 'Activar obra social'}
+                >
+                  <FiPower size={13} />
+                </Button>
+                <Button
+                  variant='secondary'
+                  className='!h-8 !w-8 !rounded-full !p-0 inline-flex items-center justify-center'
+                  onClick={() => handleEditInsurance(insurance)}
+                  aria-label='Modificar obra social'
+                  title='Modificar obra social'
+                >
+                  <FiEdit2 size={13} />
+                </Button>
+                <Button
+                  variant='danger'
+                  className='!h-8 !w-8 !rounded-full !p-0 inline-flex items-center justify-center'
+                  onClick={() => handleDeleteInsurance(insurance.id)}
+                  aria-label='Eliminar obra social'
+                  title='Eliminar obra social'
+                >
+                  <FiTrash2 size={13} />
+                </Button>
+              </div>
             </div>
           ))}
           {insurances.length === 0 ? <p className='text-sm text-emerald-900/75'>No hay obras sociales cargadas.</p> : null}
