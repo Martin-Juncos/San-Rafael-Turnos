@@ -653,11 +653,11 @@ export function DoctorDashboardPage () {
                     variant='secondary'
                     className={`px-3 py-1.5 text-xs ${
                       appointment.payment?.status === 'paid'
-                        ? '!border-emerald-200 !bg-emerald-100 !text-emerald-900 hover:!bg-emerald-200'
-                        : '!border-brand-700 !bg-brand-700 !text-white hover:!bg-brand-800'
+                        ? '!border-brand-700 !bg-brand-700 !text-white hover:!bg-brand-800'
+                        : '!border-emerald-200 !bg-emerald-100 !text-emerald-900 hover:!bg-emerald-200'
                     }`}
                     onClick={() => markPaymentAsPaid(appointment.id)}
-                    aria-pressed={appointment.payment?.status !== 'paid'}
+                    aria-pressed={appointment.payment?.status === 'paid'}
                   >
                     {appointment.payment?.status === 'paid' ? 'Pagado' : 'Pagar'}
                   </Button>
