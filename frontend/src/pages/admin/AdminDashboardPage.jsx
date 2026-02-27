@@ -344,43 +344,6 @@ export function AdminDashboardPage () {
       </div>
 
       <Card className='space-y-4'>
-        <h2 className='text-lg font-semibold text-emerald-950'>Obras sociales</h2>
-        <form className='grid gap-2 sm:grid-cols-3' onSubmit={handleCreateInsurance}>
-          <Input
-            label='Nombre'
-            value={insuranceForm.name}
-            onChange={(event) => setInsuranceForm((prev) => ({ ...prev, name: event.target.value }))}
-          />
-          <Input
-            label='Descuento (%)'
-            type='number'
-            min='0'
-            max='100'
-            step='0.01'
-            value={insuranceForm.discountPercent}
-            onChange={(event) => setInsuranceForm((prev) => ({ ...prev, discountPercent: event.target.value }))}
-          />
-          <Button type='submit' className='self-end'>Crear obra social</Button>
-        </form>
-
-        <div className='space-y-2'>
-          {insurances.map((insurance) => (
-            <div key={insurance.id} className='flex items-center justify-between rounded-xl bg-white/70 p-3 text-sm'>
-              <div>
-                <p className='font-semibold text-emerald-950'>{insurance.name}</p>
-                <p className='text-xs text-emerald-900/70'>Descuento: {insurance.discountPercent}%</p>
-                <p className='text-xs text-emerald-900/70'>Estado: {insurance.isActive ? 'Activa' : 'Inactiva'}</p>
-              </div>
-              <Button variant='danger' className='px-3 py-1.5 text-xs' onClick={() => handleDeleteInsurance(insurance.id)}>
-                Eliminar
-              </Button>
-            </div>
-          ))}
-          {insurances.length === 0 ? <p className='text-sm text-emerald-900/75'>No hay obras sociales cargadas.</p> : null}
-        </div>
-      </Card>
-
-      <Card className='space-y-4'>
         <h2 className='text-lg font-semibold text-emerald-950'>Disponibilidad por medico</h2>
         <label className='space-y-1'>
           <span className='text-xs text-emerald-900/75'>Medico</span>
@@ -418,6 +381,43 @@ export function AdminDashboardPage () {
               {dayLabels[item.dayOfWeek]} {item.startTime} - {item.endTime} ({item.slotMinutes} min)
             </div>
           ))}
+        </div>
+      </Card>
+
+      <Card className='space-y-4'>
+        <h2 className='text-lg font-semibold text-emerald-950'>Obras sociales</h2>
+        <form className='grid gap-2 sm:grid-cols-3' onSubmit={handleCreateInsurance}>
+          <Input
+            label='Nombre'
+            value={insuranceForm.name}
+            onChange={(event) => setInsuranceForm((prev) => ({ ...prev, name: event.target.value }))}
+          />
+          <Input
+            label='Descuento (%)'
+            type='number'
+            min='0'
+            max='100'
+            step='0.01'
+            value={insuranceForm.discountPercent}
+            onChange={(event) => setInsuranceForm((prev) => ({ ...prev, discountPercent: event.target.value }))}
+          />
+          <Button type='submit' className='self-end'>Crear obra social</Button>
+        </form>
+
+        <div className='space-y-2'>
+          {insurances.map((insurance) => (
+            <div key={insurance.id} className='flex items-center justify-between rounded-xl bg-white/70 p-3 text-sm'>
+              <div>
+                <p className='font-semibold text-emerald-950'>{insurance.name}</p>
+                <p className='text-xs text-emerald-900/70'>Descuento: {insurance.discountPercent}%</p>
+                <p className='text-xs text-emerald-900/70'>Estado: {insurance.isActive ? 'Activa' : 'Inactiva'}</p>
+              </div>
+              <Button variant='danger' className='px-3 py-1.5 text-xs' onClick={() => handleDeleteInsurance(insurance.id)}>
+                Eliminar
+              </Button>
+            </div>
+          ))}
+          {insurances.length === 0 ? <p className='text-sm text-emerald-900/75'>No hay obras sociales cargadas.</p> : null}
         </div>
       </Card>
 
