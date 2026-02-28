@@ -301,6 +301,18 @@ export const createMercadoPagoPreferenceForAppointment = async (req, res) => {
     externalRef: `preference_${preference.id}`
   })
 
+  logger.info(
+    {
+      requestId: req.requestId,
+      actorRole: req.auth.role,
+      actorId: req.auth.sub,
+      appointmentId: appointment.id,
+      localPaymentId: appointment.payment.id,
+      preferenceId: preference.id
+    },
+    'mercadopago-preference-created'
+  )
+
   await writeAuditLog({
     actorRole: req.auth.role,
     actorId: req.auth.sub,
@@ -364,10 +376,34 @@ const resolveWebhookPaymentId = (req) => {
 
 export const mercadoPagoWebhook = async (req, res) => {
   const paymentId = resolveWebhookPaymentId(req)
+  const topic = String(req.body?.topic || req.query.topic || req.body?.type || '')
+  const action = String(req.body?.action || req.query.action || '')
+  const webhookEventId = req.body?.id || req.query.id || null
   const signature = req.headers['x-signature']
   const requestId = req.headers['x-request-id']
 
+  logger.info(
+    {
+      requestId: req.requestId,
+      webhookRequestId: Array.isArray(requestId) ? requestId[0] : requestId,
+      webhookEventId: webhookEventId ? String(webhookEventId) : null,
+      topic,
+      action,
+      paymentId: paymentId ? String(paymentId) : null
+    },
+    'mercadopago-webhook-received'
+  )
+
   if (!paymentId) {
+    logger.warn(
+      {
+        requestId: req.requestId,
+        webhookEventId: webhookEventId ? String(webhookEventId) : null,
+        topic,
+        action
+      },
+      'mercadopago-webhook-ignored-missing-payment-id'
+    )
     ok(res, { received: true, ignored: 'missing_payment_id' }, 'mercadopago_webhook_ignored')
     return
   }
@@ -381,6 +417,10 @@ export const mercadoPagoWebhook = async (req, res) => {
   if (!isValidSignature) {
     logger.warn(
       {
+        requestId: req.requestId,
+        webhookEventId: webhookEventId ? String(webhookEventId) : null,
+        topic,
+        action,
         paymentId: String(paymentId)
       },
       'mercadopago-webhook-invalid-signature'
@@ -398,6 +438,10 @@ export const mercadoPagoWebhook = async (req, res) => {
     .then((reconciled) => {
       logger.info(
         {
+          requestId: req.requestId,
+          webhookEventId: webhookEventId ? String(webhookEventId) : null,
+          topic,
+          action,
           paymentId: String(paymentId),
           reconciled: Boolean(reconciled)
         },
@@ -407,6 +451,10 @@ export const mercadoPagoWebhook = async (req, res) => {
     .catch((error) => {
       logger.error(
         {
+          requestId: req.requestId,
+          webhookEventId: webhookEventId ? String(webhookEventId) : null,
+          topic,
+          action,
           err: error,
           paymentId: String(paymentId)
         },
