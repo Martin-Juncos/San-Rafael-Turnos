@@ -402,10 +402,6 @@ export function ReservePage () {
       setPaymentError('')
 
       try {
-        if (paymentId) {
-          await paymentsService.syncMercadoPago(paymentId)
-        }
-
         if (!appointmentId) {
           clearQuery()
           return
@@ -426,8 +422,10 @@ export function ReservePage () {
         await loadPatientAppointments()
         setShowCheckout(false)
 
-        if (payment.status === 'paid' || mpStatus === 'success') {
-          setSuccess('Pago aprobado por Mercado Pago. Tu turno quedo confirmado.')
+        if (payment.status === 'paid') {
+          setSuccess('Pago aprobado y validado. Tu turno quedo confirmado.')
+        } else if (mpStatus === 'success' || paymentId) {
+          setSuccess('Recibimos tu regreso de Mercado Pago. Estamos validando el pago con webhook seguro.')
         } else if (mpStatus === 'failure') {
           setError('El pago en Mercado Pago fue rechazado o cancelado.')
         } else if (mpStatus === 'pending') {
