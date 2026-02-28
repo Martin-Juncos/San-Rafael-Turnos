@@ -37,6 +37,22 @@ export const initPaymentModel = (sequelize) => {
         type: DataTypes.STRING,
         allowNull: true
       },
+      preferenceId: {
+        type: DataTypes.STRING,
+        allowNull: true
+      },
+      providerPaymentId: {
+        type: DataTypes.STRING,
+        allowNull: true
+      },
+      providerStatus: {
+        type: DataTypes.STRING,
+        allowNull: true
+      },
+      lastWebhookPayload: {
+        type: DataTypes.JSONB,
+        allowNull: true
+      },
       paidAt: {
         type: DataTypes.DATE,
         allowNull: true
@@ -49,6 +65,9 @@ export const initPaymentModel = (sequelize) => {
       indexes: [
         {
           fields: ['status']
+        },
+        {
+          fields: ['providerPaymentId']
         }
       ]
     }

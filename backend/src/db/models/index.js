@@ -10,6 +10,7 @@ import { initPatientModel, Patient } from './Patient.js'
 import { initPatientOtpModel, PatientOtp } from './PatientOtp.js'
 import { initAppointmentModel, Appointment } from './Appointment.js'
 import { initPaymentModel, Payment } from './Payment.js'
+import { initPaymentWebhookEventModel, PaymentWebhookEvent } from './PaymentWebhookEvent.js'
 import { initMessageModel, Message } from './Message.js'
 import { initAuditLogModel, AuditLog } from './AuditLog.js'
 import { initConsultNoteModel, ConsultNote } from './ConsultNote.js'
@@ -32,6 +33,7 @@ export const initModels = () => {
   initPatientOtpModel(sequelize)
   initAppointmentModel(sequelize)
   initPaymentModel(sequelize)
+  initPaymentWebhookEventModel(sequelize)
   initMessageModel(sequelize)
   initAuditLogModel(sequelize)
   initConsultNoteModel(sequelize)
@@ -59,6 +61,8 @@ export const initModels = () => {
 
   Appointment.hasOne(Payment, { foreignKey: 'appointmentId', as: 'payment' })
   Payment.belongsTo(Appointment, { foreignKey: 'appointmentId', as: 'appointment' })
+  Payment.hasMany(PaymentWebhookEvent, { foreignKey: 'paymentId', as: 'webhookEvents' })
+  PaymentWebhookEvent.belongsTo(Payment, { foreignKey: 'paymentId', as: 'payment' })
 
   Appointment.hasMany(Message, { foreignKey: 'appointmentId', as: 'messages' })
   Message.belongsTo(Appointment, { foreignKey: 'appointmentId', as: 'appointment' })
@@ -96,6 +100,7 @@ export {
   PatientOtp,
   Appointment,
   Payment,
+  PaymentWebhookEvent,
   Message,
   AuditLog,
   ConsultNote

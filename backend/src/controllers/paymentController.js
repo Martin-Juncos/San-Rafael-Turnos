@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { config } from '../config/env.js'
 import { logger } from '../config/logger.js'
-import { Appointment, Payment, Doctor, Patient, sequelize } from '../db/models/index.js'
+import { Appointment, Payment, PaymentWebhookEvent, Doctor, Patient, sequelize } from '../db/models/index.js'
 import { AppError } from '../utils/errors.js'
 import { ok } from '../utils/response.js'
 import { writeAuditLog } from '../utils/audit.js'
@@ -77,14 +77,19 @@ const mapMercadoPagoStatusToLocal = (status) => {
   return 'pending'
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
 const extractCorrelation = (paymentPayload) => {
   const externalReference = String(paymentPayload.external_reference ?? '')
   const metadata = paymentPayload.metadata ?? {}
-  const matches = externalReference.match(/appointment:([0-9a-f-]+):payment:([0-9a-f-]+)/i)
+  const normalizedExternalReference = externalReference.trim()
+  const appointmentIdFromExternalReference = UUID_REGEX.test(normalizedExternalReference)
+    ? normalizedExternalReference
+    : null
 
   return {
-    appointmentId: metadata.appointmentId || matches?.[1] || null,
-    paymentId: metadata.paymentId || matches?.[2] || null
+    appointmentId: metadata.appointmentId || appointmentIdFromExternalReference || null,
+    paymentId: metadata.localPaymentId || metadata.paymentId || null
   }
 }
 
@@ -116,6 +121,7 @@ const buildMercadoPagoBackUrls = (appointmentId) => {
 
 const reconcileMercadoPagoPayment = async ({
   mercadoPagoPaymentId,
+  webhookContext = null,
   actorRole = 'system',
   actorId = null
 }) => {
@@ -128,23 +134,73 @@ const reconcileMercadoPagoPayment = async ({
   }
 
   const nextStatus = mapMercadoPagoStatusToLocal(mpPayment.status)
-  const becamePaid = appointment.payment.status !== 'paid' && nextStatus === 'paid'
+  const providerPaymentId = String(mpPayment.id)
+  const preferenceId = String(mpPayment.preference_id || '')
+  let becamePaid = false
+  let idempotentHit = false
 
   await sequelize.transaction(async (transaction) => {
-    await appointment.payment.update(
+    const lockedAppointment = await Appointment.findByPk(appointment.id, {
+      include: [{ model: Payment, as: 'payment' }],
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    })
+
+    if (!lockedAppointment?.payment) return
+
+    const lockedPayment = lockedAppointment.payment
+
+    if (webhookContext) {
+      try {
+        await PaymentWebhookEvent.create(
+          {
+            paymentId: lockedPayment.id,
+            provider: 'mercadopago',
+            providerPaymentId,
+            providerStatus: String(mpPayment.status || ''),
+            preferenceId: preferenceId || null,
+            externalReference: String(mpPayment.external_reference || '') || null,
+            webhookEventId: webhookContext.webhookEventId || null,
+            webhookTopic: webhookContext.topic || null,
+            webhookAction: webhookContext.action || null,
+            payload: webhookContext.payload
+          },
+          { transaction }
+        )
+      } catch (error) {
+        if (error?.name === 'SequelizeUniqueConstraintError') {
+          idempotentHit = true
+          return
+        }
+        throw error
+      }
+    }
+
+    if (lockedPayment.providerPaymentId === providerPaymentId && lockedPayment.status === nextStatus) {
+      idempotentHit = true
+      return
+    }
+
+    becamePaid = lockedPayment.status !== 'paid' && nextStatus === 'paid'
+
+    await lockedPayment.update(
       {
         provider: 'mercadopago',
-        externalRef: String(mpPayment.id),
+        externalRef: providerPaymentId,
+        preferenceId: preferenceId || lockedPayment.preferenceId,
+        providerPaymentId,
+        providerStatus: String(mpPayment.status || ''),
+        lastWebhookPayload: webhookContext?.payload ?? lockedPayment.lastWebhookPayload,
         status: nextStatus,
         paidAt: nextStatus === 'paid'
           ? new Date(mpPayment.date_approved || Date.now())
-          : appointment.payment.paidAt
+          : lockedPayment.paidAt
       },
       { transaction }
     )
 
-    if (becamePaid && appointment.status !== 'confirmed') {
-      await appointment.update(
+    if (becamePaid && lockedAppointment.status !== 'confirmed') {
+      await lockedAppointment.update(
         {
           status: 'confirmed'
         },
@@ -157,16 +213,30 @@ const reconcileMercadoPagoPayment = async ({
       actorId,
       action: 'PAYMENT_MERCADOPAGO_RECONCILED',
       entity: 'Payment',
-      entityId: appointment.payment.id,
+      entityId: lockedPayment.id,
       meta: {
-        appointmentId: appointment.id,
-        mercadoPagoPaymentId: String(mpPayment.id),
+        appointmentId: lockedAppointment.id,
+        mercadoPagoPaymentId: providerPaymentId,
         mercadoPagoStatus: mpPayment.status,
-        localStatus: nextStatus
+        localStatus: nextStatus,
+        idempotentHit
       },
       transaction
     })
   })
+
+  if (idempotentHit) {
+    const refreshedIdempotent = await Appointment.findByPk(appointment.id, {
+      include: appointmentWithPaymentInclude
+    })
+
+    return {
+      appointment: refreshedIdempotent,
+      payment: refreshedIdempotent?.payment || null,
+      mercadoPagoStatus: mpPayment.status,
+      idempotent: true
+    }
+  }
 
   if (becamePaid) {
     const message = buildAppointmentConfirmationMessage({
@@ -269,7 +339,7 @@ export const createMercadoPagoPreferenceForAppointment = async (req, res) => {
     throw new AppError('El pago ya fue procesado', 400, 'payment_already_processed')
   }
 
-  const externalReference = `appointment:${appointment.id}:payment:${appointment.payment.id}`
+  const externalReference = appointment.id
   const payload = {
     items: [
       {
@@ -283,7 +353,7 @@ export const createMercadoPagoPreferenceForAppointment = async (req, res) => {
     external_reference: externalReference,
     metadata: {
       appointmentId: appointment.id,
-      paymentId: appointment.payment.id,
+      localPaymentId: appointment.payment.id,
       patientId: appointment.patientId
     },
     auto_return: 'approved',
@@ -298,7 +368,8 @@ export const createMercadoPagoPreferenceForAppointment = async (req, res) => {
 
   await appointment.payment.update({
     provider: 'mercadopago',
-    externalRef: `preference_${preference.id}`
+    externalRef: `preference_${preference.id}`,
+    preferenceId: preference.id
   })
 
   logger.info(
@@ -342,27 +413,35 @@ export const syncMercadoPagoPayment = async (req, res) => {
     throw new AppError('Prohibido', 403, 'forbidden')
   }
 
-  const reconciled = await reconcileMercadoPagoPayment({
-    mercadoPagoPaymentId: req.validated.body.paymentId,
-    actorRole: req.auth.role,
-    actorId: req.auth.sub
+  const providerPaymentId = String(req.validated.body.paymentId)
+  const payment = await Payment.findOne({
+    where: { providerPaymentId },
+    include: [{ model: Appointment, as: 'appointment' }]
   })
 
-  if (!reconciled) {
+  if (!payment || !payment.appointment) {
     throw new AppError('Pago no encontrado o sin correlacion local', 404, 'payment_not_found')
   }
 
-  ensurePaymentReadPermission(req.auth, reconciled.appointment)
+  const appointment = await Appointment.findByPk(payment.appointment.id, {
+    include: appointmentWithPaymentInclude
+  })
+
+  if (!appointment || !appointment.payment) {
+    throw new AppError('Pago no encontrado o sin correlacion local', 404, 'payment_not_found')
+  }
+  ensurePaymentReadPermission(req.auth, appointment)
 
   ok(
     res,
     {
-      payment: reconciled.payment,
-      appointmentStatus: reconciled.appointment.status,
-      appointmentId: reconciled.appointment.id,
-      mercadoPagoStatus: reconciled.mercadoPagoStatus
+      payment: appointment.payment,
+      appointmentStatus: appointment.status,
+      appointmentId: appointment.id,
+      mercadoPagoStatus: appointment.payment.providerStatus || null,
+      note: 'El estado de pago se actualiza unicamente por webhook verificado de Mercado Pago.'
     },
-    'mercadopago_payment_synced'
+    'mercadopago_payment_readonly'
   )
 }
 
@@ -433,7 +512,13 @@ export const mercadoPagoWebhook = async (req, res) => {
 
   Promise.resolve()
     .then(() => reconcileMercadoPagoPayment({
-      mercadoPagoPaymentId: String(paymentId)
+      mercadoPagoPaymentId: String(paymentId),
+      webhookContext: {
+        webhookEventId: webhookEventId ? String(webhookEventId) : null,
+        topic,
+        action,
+        payload: req.body || {}
+      }
     }))
     .then((reconciled) => {
       logger.info(
