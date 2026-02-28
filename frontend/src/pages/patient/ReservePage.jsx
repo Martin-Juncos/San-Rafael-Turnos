@@ -436,7 +436,7 @@ export function ReservePage () {
         summaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       } catch (apiError) {
         if (!isCancelled) {
-          setError(apiError.message || 'No se pudo sincronizar el pago de Mercado Pago.')
+          setError(apiError.message || 'No se pudo consultar el estado del pago de Mercado Pago.')
           clearQuery()
         }
       }
