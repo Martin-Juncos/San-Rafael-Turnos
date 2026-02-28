@@ -59,9 +59,11 @@ export const initPaymentWebhookEventModel = (sequelize) => {
       tableName: 'PaymentWebhookEvent',
       indexes: [
         {
+          name: 'payment_webhook_event_payment_idx',
           fields: ['paymentId']
         },
         {
+          name: 'payment_webhook_event_dedupe_uq',
           unique: true,
           fields: ['provider', 'paymentId', 'providerPaymentId', 'providerStatus']
         }
