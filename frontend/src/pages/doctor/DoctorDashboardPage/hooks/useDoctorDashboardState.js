@@ -1,0 +1,143 @@
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAppSelector } from '../../../../app/hooks'
+import { selectAuth } from '../../../../features/auth/authSlice'
+import { useDoctorSpecialty } from '../../../../hooks/useDoctorSpecialty'
+import {
+  APPOINTMENT_STATUS_OPTIONS,
+  PAYMENT_STATUS_OPTIONS,
+  APPOINTMENT_STATUS_LABELS,
+  PAYMENT_STATUS_LABELS
+} from '../doctorDashboardUtils'
+import { useDoctorActions } from './useDoctorActions'
+import { useDoctorAgenda } from './useDoctorAgenda'
+import { useDoctorFilters } from './useDoctorFilters'
+import { useDoctorMessages } from './useDoctorMessages'
+
+export function useDoctorDashboardState () {
+  const navigate = useNavigate()
+  const auth = useAppSelector(selectAuth)
+  const doctorSpecialtyId = useDoctorSpecialty(auth.role === 'doctor' ? auth.user?.doctorId : '')
+
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+  const [feedbackModal, setFeedbackModal] = useState({
+    open: false,
+    type: 'success',
+    title: '',
+    description: ''
+  })
+
+  const filters = useDoctorFilters()
+  const syncManagementForm = filters.syncManagementForm
+
+  const agenda = useDoctorAgenda({
+    selectedAppointmentId: filters.selectedAppointmentId,
+    setSelectedAppointmentId: filters.setSelectedAppointmentId,
+    setSelectedPrintDate: filters.setSelectedPrintDate,
+    setError
+  })
+
+  const doctorMessages = useDoctorMessages({
+    appointments: agenda.appointments,
+    selectedAppointmentId: filters.selectedAppointmentId,
+    selectedAppointment: agenda.selectedAppointment,
+    chatDraft: filters.chatDraft,
+    setChatDraft: filters.setChatDraft,
+    setError
+  })
+
+  useEffect(() => {
+    syncManagementForm(agenda.selectedAppointment)
+  }, [agenda.selectedAppointment, syncManagementForm])
+
+  useEffect(() => {
+    if (!message) return
+    setFeedbackModal({
+      open: true,
+      type: 'success',
+      title: 'Operacion completada',
+      description: message
+    })
+  }, [message])
+
+  useEffect(() => {
+    if (!error) return
+    setFeedbackModal({
+      open: true,
+      type: 'error',
+      title: 'No se pudo completar la operacion',
+      description: error
+    })
+  }, [error])
+
+  const closeFeedbackModal = () => {
+    setFeedbackModal((prev) => ({ ...prev, open: false }))
+    setMessage('')
+    setError('')
+  }
+
+  const actions = useDoctorActions({
+    navigate,
+    auth,
+    doctorSpecialtyId,
+    selectedPrintDate: filters.selectedPrintDate,
+    appointments: agenda.appointments,
+    selectedAppointmentId: filters.selectedAppointmentId,
+    selectedAppointment: agenda.selectedAppointment,
+    managementForm: filters.managementForm,
+    loadAppointments: agenda.loadAppointments,
+    setError,
+    setMessage
+  })
+
+  const handleSelectAppointment = (appointmentId) => {
+    filters.setSelectedAppointmentId(appointmentId)
+    doctorMessages.markConversationRead(appointmentId)
+  }
+
+  const handleOpenIncomingAlert = () => {
+    if (!doctorMessages.incomingAlert?.appointmentId) return
+    handleSelectAppointment(doctorMessages.incomingAlert.appointmentId)
+    doctorMessages.setIncomingAlert(null)
+  }
+
+  return {
+    auth,
+    error,
+    message,
+    feedbackModal,
+    closeFeedbackModal,
+    appointments: agenda.appointments,
+    selectedAppointment: agenda.selectedAppointment,
+    printableDates: agenda.printableDates,
+    selectedAppointmentId: filters.selectedAppointmentId,
+    selectedPrintDate: filters.selectedPrintDate,
+    managementForm: filters.managementForm,
+    chatDraft: filters.chatDraft,
+    setSelectedPrintDate: filters.setSelectedPrintDate,
+    setManagementForm: filters.setManagementForm,
+    setChatDraft: filters.setChatDraft,
+    messages: doctorMessages.messages,
+    incomingAlert: doctorMessages.incomingAlert,
+    setIncomingAlert: doctorMessages.setIncomingAlert,
+    unreadAppointmentIds: doctorMessages.unreadAppointmentIds,
+    chatEligibleAppointments: doctorMessages.chatEligibleAppointments,
+    handleSelectAppointment,
+    handleOpenIncomingAlert,
+    markConversationRead: doctorMessages.markConversationRead,
+    sendMessage: doctorMessages.sendMessage,
+    savingManagement: actions.savingManagement,
+    updateStatus: actions.updateStatus,
+    markPaymentAsPaid: actions.markPaymentAsPaid,
+    saveManagement: actions.saveManagement,
+    openPrintDayView: actions.openPrintDayView,
+    openReserveWithPrefill: actions.openReserveWithPrefill,
+    openPatientRecords: actions.openPatientRecords,
+    openConsultRecord: actions.openConsultRecord,
+    appointmentStatusOptions: APPOINTMENT_STATUS_OPTIONS,
+    paymentStatusOptions: PAYMENT_STATUS_OPTIONS,
+    appointmentStatusLabels: APPOINTMENT_STATUS_LABELS,
+    paymentStatusLabels: PAYMENT_STATUS_LABELS
+  }
+}
