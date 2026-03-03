@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { appointmentsService, doctorsService, paymentsService } from '../../api/services'
+import { appointmentsService, paymentsService } from '../../api/services'
 import { Card } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
 import { ActionResultModal } from '../../components/ui/ActionResultModal'
 import { useAppSelector } from '../../app/hooks'
 import { selectAuth } from '../../features/auth/authSlice'
+import { useDoctorSpecialty } from '../../hooks/useDoctorSpecialty'
 
 const sameArray = (left, right) => {
   if (left.length !== right.length) return false
@@ -76,10 +77,10 @@ const buildManagementForm = (appointment) => {
 export function DoctorDashboardPage () {
   const navigate = useNavigate()
   const auth = useAppSelector(selectAuth)
+  const doctorSpecialtyId = useDoctorSpecialty(auth.role === 'doctor' ? auth.user?.doctorId : '')
   const [appointments, setAppointments] = useState([])
   const [selectedAppointmentId, setSelectedAppointmentId] = useState('')
   const [selectedPrintDate, setSelectedPrintDate] = useState('')
-  const [doctorSpecialtyId, setDoctorSpecialtyId] = useState('')
   const [messages, setMessages] = useState([])
   const [managementForm, setManagementForm] = useState(EMPTY_MANAGEMENT_FORM)
   const [savingManagement, setSavingManagement] = useState(false)
@@ -134,30 +135,6 @@ export function DoctorDashboardPage () {
       return printableDates[0] || ''
     })
   }, [printableDates])
-
-  useEffect(() => {
-    if (auth.role !== 'doctor' || !auth.user?.doctorId) {
-      setDoctorSpecialtyId('')
-      return
-    }
-
-    let isCancelled = false
-
-    const loadDoctorProfile = async () => {
-      try {
-        const doctor = await doctorsService.getById(auth.user.doctorId)
-        if (isCancelled) return
-        setDoctorSpecialtyId(doctor.specialtyId || '')
-      } catch (_apiError) {
-        if (!isCancelled) setDoctorSpecialtyId('')
-      }
-    }
-
-    loadDoctorProfile().catch(() => {})
-    return () => {
-      isCancelled = true
-    }
-  }, [auth.role, auth.user?.doctorId])
 
   const markConversationRead = useCallback((appointmentId) => {
     setUnreadAppointmentIds((prev) => {

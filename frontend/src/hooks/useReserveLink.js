@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
-import { doctorsService } from '../api/services'
+import { useMemo } from 'react'
 import { useAppSelector } from '../app/hooks'
 import { selectAuth } from '../features/auth/authSlice'
+import { useDoctorSpecialty } from './useDoctorSpecialty'
 
 const BASE_RESERVE_PATH = '/reservar'
 
@@ -19,34 +19,7 @@ const buildReservePath = ({ doctorId, specialtyId }) => {
 export function useReserveLink () {
   const auth = useAppSelector(selectAuth)
   const doctorId = auth.role === 'doctor' ? auth.user?.doctorId : ''
-  const [specialtyId, setSpecialtyId] = useState('')
-
-  useEffect(() => {
-    if (!doctorId) {
-      setSpecialtyId('')
-      return
-    }
-
-    let cancelled = false
-
-    const loadDoctorSpecialty = async () => {
-      try {
-        const doctor = await doctorsService.getById(doctorId)
-        if (!cancelled) {
-          setSpecialtyId(doctor.specialtyId || '')
-        }
-      } catch {
-        if (!cancelled) {
-          setSpecialtyId('')
-        }
-      }
-    }
-
-    loadDoctorSpecialty().catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [doctorId])
+  const specialtyId = useDoctorSpecialty(doctorId)
 
   return useMemo(
     () => buildReservePath({ doctorId, specialtyId }),

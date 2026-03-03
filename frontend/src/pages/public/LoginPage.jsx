@@ -265,7 +265,7 @@ export function LoginPage () {
           </form>
         )}
 
-        {error ? <p className='text-sm text-red-600'>{error}</p> : null}
+        {error ? <p className='text-sm text-red-600' role='alert' aria-live='assertive'>{error}</p> : null}
       </Card>
 
       <Card className='space-y-3'>

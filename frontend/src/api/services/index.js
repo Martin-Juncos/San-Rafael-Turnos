@@ -1,11 +1,13 @@
-export { authService } from './authService'
-export { patientAuthService } from './patientAuthService'
-export { specialtiesService } from './specialtiesService'
-export { insurancesService } from './insurancesService'
-export { doctorsService } from './doctorsService'
-export { secretariesService } from './secretariesService'
-export { slotsService } from './slotsService'
-export { appointmentsService } from './appointmentsService'
-export { paymentsService } from './paymentsService'
-export { notificationsService } from './notificationsService'
-export { newsService } from './newsService'
+export {
+  authService,
+  patientAuthService,
+  specialtiesService,
+  insurancesService,
+  doctorsService,
+  secretariesService,
+  slotsService,
+  appointmentsService,
+  paymentsService,
+  notificationsService,
+  newsService
+} from '../../services/api'

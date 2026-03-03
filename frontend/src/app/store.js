@@ -4,11 +4,16 @@ import { specialtiesReducer } from '../features/specialties/specialtiesSlice'
 import { doctorsReducer } from '../features/doctors/doctorsSlice'
 import { appointmentsReducer } from '../features/appointments/appointmentsSlice'
 
-export const store = configureStore({
-  reducer: {
-    auth: authReducer,
-    specialties: specialtiesReducer,
-    doctors: doctorsReducer,
-    appointments: appointmentsReducer
-  }
+const reducer = {
+  auth: authReducer,
+  specialties: specialtiesReducer,
+  doctors: doctorsReducer,
+  appointments: appointmentsReducer
+}
+
+export const createAppStore = (preloadedState) => configureStore({
+  reducer,
+  preloadedState
 })
+
+export const store = createAppStore()
