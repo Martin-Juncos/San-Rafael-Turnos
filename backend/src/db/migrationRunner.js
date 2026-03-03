@@ -3,12 +3,23 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { QueryTypes } from 'sequelize'
 import { sequelize } from '../config/database.js'
+import { config } from '../config/env.js'
 import { logger } from '../config/logger.js'
 
 const dbDir = path.dirname(fileURLToPath(import.meta.url))
 const migrationsDir = path.join(dbDir, 'migrations')
+const schemaName = config.DB_SCHEMA?.trim()
+const BASELINE_MIGRATION_NAME = '000_initial_schema'
+
+const ensureSearchPath = async () => {
+  if (!schemaName) {
+    return
+  }
+  await sequelize.query(`SET search_path TO "${schemaName}", public;`)
+}
 
 const ensureMigrationsTable = async () => {
+  await ensureSearchPath()
   await sequelize.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       migration_name TEXT PRIMARY KEY,
@@ -16,6 +27,113 @@ const ensureMigrationsTable = async () => {
       applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `)
+}
+
+const insertMigrationRecord = async ({ migrationName, upFile, transaction }) => {
+  await sequelize.query(
+    `
+      INSERT INTO schema_migrations (migration_name, up_file, applied_at)
+      VALUES (:migrationName, :upFile, NOW());
+    `,
+    {
+      transaction,
+      replacements: {
+        migrationName,
+        upFile
+      }
+    }
+  )
+}
+
+const getAppliedMigrationRows = async () => {
+  const rows = await sequelize.query(
+    `
+      SELECT migration_name, up_file, applied_at
+      FROM schema_migrations
+      ORDER BY applied_at ASC, migration_name ASC;
+    `,
+    { type: QueryTypes.SELECT }
+  )
+  return rows
+}
+
+const hasBusinessTables = async () => {
+  const [result] = await sequelize.query(
+    `
+      SELECT EXISTS (
+        SELECT 1
+        FROM pg_tables
+        WHERE schemaname = current_schema()
+          AND tablename <> 'schema_migrations'
+      ) AS has_existing_tables;
+    `,
+    { type: QueryTypes.SELECT }
+  )
+
+  return Boolean(result?.has_existing_tables)
+}
+
+const getCurrentSchema = async () => {
+  const [row] = await sequelize.query(
+    'SELECT current_schema() AS schema_name;',
+    { type: QueryTypes.SELECT }
+  )
+  return row?.schema_name || 'public'
+}
+
+const ensureBaselineConsistency = async ({ appliedSet, migrations }) => {
+  const baselineMigration = migrations.find((migration) => migration.migrationName === BASELINE_MIGRATION_NAME)
+  if (!baselineMigration) {
+    return {
+      baselineMigration: null,
+      baselineState: 'missing_file',
+      assumedApplied: false
+    }
+  }
+
+  if (appliedSet.has(BASELINE_MIGRATION_NAME)) {
+    return {
+      baselineMigration,
+      baselineState: 'applied',
+      assumedApplied: false
+    }
+  }
+
+  const existingTables = await hasBusinessTables()
+  if (!existingTables) {
+    return {
+      baselineMigration,
+      baselineState: 'pending_fresh_schema',
+      assumedApplied: false
+    }
+  }
+
+  if (config.DB_BASELINE_ASSUME_APPLIED) {
+    await insertMigrationRecord({
+      migrationName: baselineMigration.migrationName,
+      upFile: baselineMigration.upFile
+    })
+    appliedSet.add(BASELINE_MIGRATION_NAME)
+    logger.warn(
+      { migration: BASELINE_MIGRATION_NAME, schema: await getCurrentSchema() },
+      'baseline-assumed-applied'
+    )
+    return {
+      baselineMigration,
+      baselineState: 'assumed_applied',
+      assumedApplied: true
+    }
+  }
+
+  throw new Error(
+    [
+      `Schema inconsistente: existen tablas en ${await getCurrentSchema()} sin marca de baseline (${BASELINE_MIGRATION_NAME}) en schema_migrations.`,
+      'Para proteger el esquema, la migracion se detuvo.',
+      'Opciones:',
+      '1) Ejecutar baseline en un schema vacio.',
+      '2) Si confirmas manualmente que el baseline ya esta representado, correr: DB_BASELINE_ASSUME_APPLIED=true npm run db:migrate'
+    ].join(' ')
+  )
 }
 
 const resolveMigrationRecord = (fileName) => {
@@ -53,14 +171,12 @@ const listUpMigrations = async () => {
 export const applySqlMigrations = async () => {
   await ensureMigrationsTable()
 
-  const appliedRows = await sequelize.query(
-    'SELECT migration_name FROM schema_migrations',
-    { type: QueryTypes.SELECT }
-  )
+  const appliedRows = await getAppliedMigrationRows()
   const appliedSet = new Set(appliedRows.map((row) => row.migration_name))
   const migrations = await listUpMigrations()
   const appliedNow = []
   const skipped = []
+  const consistency = await ensureBaselineConsistency({ appliedSet, migrations })
 
   for (const migration of migrations) {
     if (appliedSet.has(migration.migrationName)) {
@@ -73,19 +189,11 @@ export const applySqlMigrations = async () => {
 
     await sequelize.transaction(async (transaction) => {
       await sequelize.query(sql, { transaction })
-      await sequelize.query(
-        `
-          INSERT INTO schema_migrations (migration_name, up_file, applied_at)
-          VALUES (:migrationName, :upFile, NOW());
-        `,
-        {
-          transaction,
-          replacements: {
-            migrationName: migration.migrationName,
-            upFile: migration.upFile
-          }
-        }
-      )
+      await insertMigrationRecord({
+        migrationName: migration.migrationName,
+        upFile: migration.upFile,
+        transaction
+      })
     })
 
     appliedNow.push(migration.migrationName)
@@ -94,7 +202,47 @@ export const applySqlMigrations = async () => {
 
   return {
     applied: appliedNow,
-    skipped
+    skipped,
+    baselineState: consistency.baselineState
+  }
+}
+
+export const getSqlMigrationStatus = async () => {
+  await ensureMigrationsTable()
+
+  const schema = await getCurrentSchema()
+  const migrations = await listUpMigrations()
+  const appliedRows = await getAppliedMigrationRows()
+  const appliedSet = new Set(appliedRows.map((row) => row.migration_name))
+  const existingTables = await hasBusinessTables()
+
+  const applied = migrations
+    .filter((migration) => appliedSet.has(migration.migrationName))
+    .map((migration) => migration.migrationName)
+
+  const pending = migrations
+    .filter((migration) => !appliedSet.has(migration.migrationName))
+    .map((migration) => migration.migrationName)
+
+  const unknownApplied = appliedRows
+    .filter((row) => !migrations.some((migration) => migration.migrationName === row.migration_name))
+    .map((row) => row.migration_name)
+
+  const hasBaselineFile = migrations.some((migration) => migration.migrationName === BASELINE_MIGRATION_NAME)
+  const baselineApplied = appliedSet.has(BASELINE_MIGRATION_NAME)
+  const baselineInconsistent = hasBaselineFile && existingTables && !baselineApplied
+
+  return {
+    schema,
+    applied,
+    pending,
+    unknownApplied,
+    baseline: {
+      migrationName: BASELINE_MIGRATION_NAME,
+      hasFile: hasBaselineFile,
+      applied: baselineApplied,
+      inconsistent: baselineInconsistent
+    }
   }
 }
 

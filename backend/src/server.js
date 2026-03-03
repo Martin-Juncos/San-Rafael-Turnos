@@ -3,10 +3,12 @@ import { app } from './app.js'
 import { logger } from './config/logger.js'
 import { sequelize } from './config/database.js'
 import { config } from './config/env.js'
+import { initObservability } from './config/observability.js'
 import { startExpiredHoldsJob } from './jobs/expiredHoldsJob.js'
 
 const start = async () => {
   try {
+    await initObservability()
     await sequelize.authenticate()
     startExpiredHoldsJob()
 

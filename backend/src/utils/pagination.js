@@ -5,6 +5,8 @@ export const parsePagination = (query) => {
   return { page, pageSize, offset, limit: pageSize }
 }
 
+export const paginate = parsePagination
+
 export const buildPagination = ({ page, pageSize, total }) => ({
   page,
   pageSize,

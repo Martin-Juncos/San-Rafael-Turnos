@@ -20,7 +20,7 @@ BEGIN
       FROM pg_constraint c
       JOIN pg_class t ON t.oid = c.conrelid
       JOIN pg_namespace n ON n.oid = t.relnamespace
-      WHERE n.nspname = 'public'
+      WHERE n.nspname = current_schema()
         AND c.contype IN ('u', 'f', 'c')
     )
     SELECT schema_name, table_name, constraint_name
@@ -57,7 +57,7 @@ BEGIN
       JOIN pg_class t ON t.oid = ix.indrelid
       JOIN pg_namespace n ON n.oid = t.relnamespace
       LEFT JOIN pg_constraint c ON c.conindid = ix.indexrelid
-      WHERE n.nspname = 'public'
+      WHERE n.nspname = current_schema()
         AND c.oid IS NULL
     )
     SELECT schema_name, index_name

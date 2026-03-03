@@ -10,7 +10,7 @@ BEGIN
     JOIN information_schema.key_column_usage kcu
       ON tc.constraint_name = kcu.constraint_name
      AND tc.table_schema = kcu.table_schema
-    WHERE tc.table_schema = 'public'
+    WHERE tc.table_schema = current_schema()
       AND tc.table_name = 'Appointment'
       AND tc.constraint_type = 'FOREIGN KEY'
       AND kcu.column_name IN ('doctorId', 'patientId', 'specialtyId')
@@ -29,7 +29,7 @@ BEGIN
     JOIN information_schema.key_column_usage kcu
       ON tc.constraint_name = kcu.constraint_name
      AND tc.table_schema = kcu.table_schema
-    WHERE tc.table_schema = 'public'
+    WHERE tc.table_schema = current_schema()
       AND tc.table_name = 'Payment'
       AND tc.constraint_type = 'FOREIGN KEY'
       AND kcu.column_name = 'appointmentId'
@@ -48,7 +48,7 @@ BEGIN
     JOIN information_schema.key_column_usage kcu
       ON tc.constraint_name = kcu.constraint_name
      AND tc.table_schema = kcu.table_schema
-    WHERE tc.table_schema = 'public'
+    WHERE tc.table_schema = current_schema()
       AND tc.table_name = 'Message'
       AND tc.constraint_type = 'FOREIGN KEY'
       AND kcu.column_name = 'appointmentId'

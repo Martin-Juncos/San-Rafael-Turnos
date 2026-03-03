@@ -20,7 +20,9 @@ BEGIN
     SELECT c.conname
     FROM pg_constraint c
     JOIN pg_class t ON c.conrelid = t.oid
+    JOIN pg_namespace n ON n.oid = t.relnamespace
     WHERE t.relname = 'HealthInsurance'
+      AND n.nspname = current_schema()
       AND c.contype = 'u'
       AND pg_get_constraintdef(c.oid) = 'UNIQUE (name)'
   LOOP
@@ -35,7 +37,8 @@ BEGIN
   FOR row_item IN
     SELECT indexname
     FROM pg_indexes
-    WHERE tablename = 'HealthInsurance'
+    WHERE schemaname = current_schema()
+      AND tablename = 'HealthInsurance'
       AND (
         indexname ILIKE 'HealthInsurance_name_key%'
         OR indexname ILIKE 'healthinsurance_name_key%'

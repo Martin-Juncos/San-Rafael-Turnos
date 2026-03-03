@@ -1,70 +1,177 @@
 # Backend - San Rafael Turnos
 
-Backend API en Node.js + Express + Sequelize/PostgreSQL.
+API backend en Node.js + Express + Sequelize/PostgreSQL.
 
-## Comandos
+## Setup
+
+1. Copiar `backend/.env.example` a `backend/.env`.
+2. Completar secretos y `DATABASE_URL`.
+3. Para integracion, definir `DATABASE_URL_TEST` apuntando a una base de test.
+4. Ejecutar migraciones:
+
+```bash
+npm run db:migrate
+```
+
+5. (Opcional) Cargar seed:
+
+```bash
+npm run seed
+```
+
+6. Levantar backend:
 
 ```bash
 npm run dev
-npm run start
-npm run db:migrate
-npm run db:rollback
-npm run seed
-npm run audit:db-schema
+```
+
+Healthcheck:
+- `GET http://localhost:4000/health`
+
+## Scripts
+
+| Script | Descripcion |
+|---|---|
+| `npm run dev` | Levanta servidor con nodemon |
+| `npm run start` | Levanta servidor en modo node |
+| `npm run db:migrate` | Aplica migraciones SQL versionadas |
+| `npm run db:status` | Lista migraciones aplicadas vs pendientes |
+| `npm run db:validate` | Smoke check de esquema (tablas/columnas/FKs criticas) |
+| `npm run db:rollback` | Revierte ultima migracion SQL |
+| `npm run seed` | Carga datos iniciales |
+| `npm run audit:db-schema` | Ejecuta auditoria de esquema DB |
+| `npm run lint` | Ejecuta ESLint |
+| `npm run test` | Ejecuta tests unit/smoke (`node:test`) |
+| `npm run test:integration` | Ejecuta tests de integracion con Postgres real |
+| `npm run build` | Check de build backend |
+
+## CI (GitHub Actions)
+
+El workflow `/.github/workflows/ci.yml` valida backend-only en cada `push`/`pull_request` a `main` y `master`.
+
+Checks que ejecuta:
+- `npm run lint`
+- `npm test`
+- `npm run build`
+- `npm run db:migrate` (prepara schema en DB de test limpia)
+- `npm run db:validate`
+- `npm run test:integration` (con Postgres real en service container)
+
+Garantias de seguridad en CI:
+- usa DB de test aislada (`san_rafael_turnos_test`) en service `postgres:16`.
+- define solo `DATABASE_URL_TEST` apuntando a esa DB de test.
+- no usa secretos reales de produccion.
+
+Repro local de CI:
+
+```bash
 npm run lint
-npm run test
-```
-
-## Flujo recomendado local
-
-1. Configurar `backend/.env` (usar `backend/.env.example` como base).
-2. Ejecutar migraciones:
-
-```bash
+npm test
+npm run build
 npm run db:migrate
+npm run db:validate
+npm run test:integration
 ```
 
-3. (Opcional) Cargar datos de ejemplo:
+Variables minimas para integracion:
+- `DATABASE_URL_TEST` (obligatoria y debe incluir `test` en el nombre de DB)
+- `JWT_ACCESS_SECRET` y `JWT_REFRESH_SECRET` (>= 16 chars)
+- `FRONTEND_PUBLIC_URL`
+
+Nota:
+- en `NODE_ENV=test`, la configuracion usa `DATABASE_URL_TEST` como fuente primaria de conexion.
+
+## Estructura backend
+
+```text
+backend/
+  scripts/                # auditorias y pruebas e2e utilitarias
+  src/
+    config/               # env, db, logger, observability
+    controllers/          # adaptadores HTTP (req/res)
+    db/
+      migrations/         # migraciones SQL (up/down)
+      models/             # definicion Sequelize + asociaciones
+    jobs/                 # jobs programados (expired holds)
+    middlewares/          # auth, validacion, errores, logging, ownership
+    repositories/         # encapsulacion de consultas Sequelize
+    routes/               # declaracion de endpoints y middlewares
+    services/             # reglas de negocio
+    utils/                # helpers compartidos
+    validators/           # primitivas zod reutilizables
+  tests/                  # pruebas unitarias/smoke
+```
+
+## Tests de integracion (Postgres real)
+
+El harness de integracion:
+- exige `DATABASE_URL_TEST`,
+- valida que el nombre de DB incluya `test`,
+- crea schema unico por corrida (`test_<timestamp>_<rand>`),
+- aplica baseline DDL + migraciones SQL en ese schema (sin `sequelize.sync`),
+- trunca tablas entre tests,
+- elimina schema al finalizar.
+
+Ejecucion:
 
 ```bash
-npm run seed
+npm run test:integration
 ```
 
-4. Levantar API:
+Garantia de seguridad:
+- si `DATABASE_URL_TEST` no existe o no parece DB de test, la suite falla antes de ejecutar operaciones.
+- toda creacion de esquema se hace via migraciones versionadas en `src/db/migrations`.
+
+Migracion fresh en schema temporal (sin crear DB nueva):
 
 ```bash
-npm run dev
+DB_SCHEMA=test_manual npm run db:migrate
 ```
+
+Estado y validacion de migraciones:
+
+```bash
+npm run db:status
+npm run db:validate
+```
+
+## Baseline y ambientes existentes
+
+Regla deterministica de baseline:
+- `000_initial_schema` se considera aplicada solo si existe en `schema_migrations`.
+- si no existe marca de baseline, el runner intenta aplicarla.
+- si detecta tablas existentes sin marca baseline, aborta para evitar estado inconsistente.
+
+Procedimiento en ambiente existente (solo si confirmaste manualmente que el esquema ya equivale al baseline):
+
+```bash
+DB_BASELINE_ASSUME_APPLIED=true npm run db:migrate
+```
+
+Esto inserta la marca de baseline en `schema_migrations` y continua con pendientes.
+
+## Decisiones tecnicas
+
+- Migraciones SQL versionadas como unico mecanismo de cambio de esquema.
+- `sequelize.sync({ alter|force })` no se usa en runtime.
+- Arquitectura objetivo: `routes -> controllers -> services -> repositories/db`.
+- Errores DB de Sequelize se traducen centralmente a respuestas 4xx/5xx consistentes.
+- Logging de request con `requestId`, `durationMs`, `status`, `userRole` y `userId`.
+- Observabilidad: hooks de Sentry listos por env (`SENTRY_DSN`) sin dependencia obligatoria.
+- Seguridad baseline: `helmet`, `cors` por env, rate-limits global/auth/payments/webhook.
 
 ## Notas operativas
 
-- El backend ya no ejecuta `sequelize.sync()` al iniciar.
-- Los cambios de esquema se gestionan solo con migraciones SQL versionadas.
-- El job de expiracion de HOLD usa `pg_try_advisory_lock` para evitar ejecucion paralela en multi-instancia.
-- `npm run audit:db-schema` genera/actualiza:
+- Job de expiracion de HOLD usa `pg_try_advisory_lock` para evitar ejecucion paralela en multi-instancia.
+- `npm run audit:db-schema` genera:
   - `docs/db/schema_snapshot.json`
   - `docs/db/schema_audit.md`
 
 ## Prueba de lock single-instance (expired holds)
 
-1. Aplicar migraciones:
-
 ```bash
 npm run db:migrate
-```
-
-2. Ejecutar prueba end-to-end:
-
-```bash
 npm run test:hold-lock
 ```
 
-La prueba:
-- crea un appointment `hold` vencido (fixture),
-- levanta 2 instancias en puertos `4001` y `4002`,
-- verifica expiracion + evidencia de lock single-instance,
-- y limpia el fixture al terminar (salvo que `HOLD_LOCK_TEST_KEEP_DATA=true`).
-
-Logs de diagnostico:
-- `backend/.tmp/dual-instance-A.log`
-- `backend/.tmp/dual-instance-B.log`
+La prueba crea un `hold` vencido, levanta dos instancias (`4001` y `4002`), valida lock y limpia fixtures.

@@ -1,36 +1,44 @@
-import { Op } from 'sequelize'
 import { z } from 'zod'
 import {
   Appointment,
-  Doctor,
-  Patient,
-  Specialty,
-  HealthInsurance,
   Payment,
   sequelize
 } from '../db/models/index.js'
 import { AppError } from '../utils/errors.js'
 import { ok, paginated } from '../utils/response.js'
-import { parsePagination, buildPagination } from '../utils/pagination.js'
 import { addMinutesToTime } from '../utils/time.js'
-import { createMockPaymentIntent } from '../services/paymentService.js'
+import {
+  dniSchema,
+  phoneSchema,
+  isoDateSchema,
+  hhmmSchema,
+  optionalPaginationQuerySchema
+} from '../validators/common.js'
 import {
   ensureDoctorAvailableAtSlot,
-  ensureNoSlotConflict,
-  releaseExpiredHolds
+  ensureNoSlotConflict
 } from '../services/appointmentService.js'
 import { writeAuditLog } from '../utils/audit.js'
+import {
+  createAppointmentWithHold,
+  listPatientAppointments,
+  listScopedAppointments
+} from '../services/appointmentCrudService.js'
+import {
+  appointmentDefaultInclude,
+  findAppointmentById
+} from '../repositories/appointmentRepository.js'
 
 const createAppointmentBodySchema = z.object({
   doctorId: z.string().uuid(),
   specialtyId: z.string().uuid(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  startTime: z.string().regex(/^\d{2}:\d{2}$/),
+  date: isoDateSchema,
+  startTime: hhmmSchema,
   insuranceId: z.string().uuid().optional(),
   symptoms: z.string().max(4000).optional(),
   fullName: z.string().min(3).max(120),
-  dni: z.string().min(6).max(12),
-  phone: z.string().min(8).max(20),
+  dni: dniSchema,
+  phone: phoneSchema,
   streetAndNumber: z.string().min(3).max(160).optional(),
   city: z.string().min(2).max(120).optional(),
   slotMinutes: z.coerce.number().int().min(10).max(120).optional()
@@ -45,10 +53,7 @@ export const createAppointmentSchema = z.object({
 export const myAppointmentsSchema = z.object({
   body: z.object({}).optional(),
   params: z.object({}).optional(),
-  query: z.object({
-    page: z.coerce.number().int().positive().optional(),
-    pageSize: z.coerce.number().int().positive().optional()
-  }).optional()
+  query: optionalPaginationQuerySchema
 })
 
 export const listAppointmentsSchema = z.object({
@@ -59,8 +64,8 @@ export const listAppointmentsSchema = z.object({
     pageSize: z.coerce.number().int().positive().optional(),
     doctorId: z.string().uuid().optional(),
     specialtyId: z.string().uuid().optional(),
-    dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-    dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    dateFrom: isoDateSchema.optional(),
+    dateTo: isoDateSchema.optional(),
     status: z.string().optional(),
     patientDni: z.string().optional()
   }).optional()
@@ -76,8 +81,8 @@ export const appointmentIdSchema = z.object({
 
 export const patchAppointmentSchema = z.object({
   body: z.object({
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-    startTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+    date: isoDateSchema.optional(),
+    startTime: hhmmSchema.optional(),
     slotMinutes: z.coerce.number().int().min(10).max(120).optional(),
     symptoms: z.string().max(4000).optional(),
     status: z.enum(['requested', 'hold', 'confirmed', 'cancelled', 'rescheduled', 'attended', 'no_show']).optional(),
@@ -102,8 +107,8 @@ export const cancelAppointmentSchema = z.object({
 
 export const rescheduleAppointmentSchema = z.object({
   body: z.object({
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    startTime: z.string().regex(/^\d{2}:\d{2}$/),
+    date: isoDateSchema,
+    startTime: hhmmSchema,
     slotMinutes: z.coerce.number().int().min(10).max(120).optional()
   }),
   query: z.object({}).optional(),
@@ -112,13 +117,7 @@ export const rescheduleAppointmentSchema = z.object({
   })
 })
 
-const includeDefault = [
-  { model: Doctor, as: 'doctor' },
-  { model: Specialty, as: 'specialty' },
-  { model: HealthInsurance, as: 'insurance' },
-  { model: Patient, as: 'patient' },
-  { model: Payment, as: 'payment' }
-]
+const includeDefault = appointmentDefaultInclude
 
 const ensureAppointmentPermission = (auth, appointment) => {
   if (!auth) {
@@ -136,177 +135,15 @@ const ensureAppointmentPermission = (auth, appointment) => {
   throw new AppError('Prohibido', 403, 'forbidden')
 }
 
-const normalizePatientPayload = ({ fullName, dni, phone, streetAndNumber, city }) => {
-  const normalized = {
-    fullName: fullName.trim(),
-    dni: String(dni).replace(/\D/g, ''),
-    phone: String(phone).replace(/[^\d+]/g, '')
-  }
-
-  if (typeof streetAndNumber !== 'undefined') {
-    normalized.streetAndNumber = streetAndNumber.trim() || null
-  }
-  if (typeof city !== 'undefined') {
-    normalized.city = city.trim() || null
-  }
-
-  return normalized
-}
-
 export const createAppointment = async (req, res) => {
-  const payload = req.validated.body
-  const slotMinutes = payload.slotMinutes ?? 30
-  const endTime = addMinutesToTime(payload.startTime, slotMinutes)
-  const actorRole = req.auth.role
-  const actorId = req.auth.sub
-
-  if (!['patient', 'clinic', 'admin', 'doctor'].includes(actorRole)) {
-    throw new AppError('Prohibido', 403, 'forbidden')
-  }
-
-  const patientInput = normalizePatientPayload(payload)
-  if (actorRole === 'patient' && req.auth.dni && req.auth.dni !== patientInput.dni) {
-    throw new AppError('El DNI no coincide con tu sesion', 403, 'dni_mismatch')
-  }
-
-  let appointment
-  let payment
-  let paymentIntent
-  let pricing = null
-
-  try {
-    await sequelize.transaction(async (transaction) => {
-      await releaseExpiredHolds(transaction)
-      await ensureDoctorAvailableAtSlot({
-        doctorId: payload.doctorId,
-        date: payload.date,
-        startTime: payload.startTime,
-        endTime,
-        transaction
-      })
-      await ensureNoSlotConflict({
-        doctorId: payload.doctorId,
-        date: payload.date,
-        startTime: payload.startTime,
-        transaction
-      })
-
-      const [patient] = await Patient.findOrCreate({
-        where: { dni: patientInput.dni },
-        defaults: {
-          dni: patientInput.dni,
-          fullName: patientInput.fullName,
-          phone: patientInput.phone,
-          streetAndNumber: patientInput.streetAndNumber ?? null,
-          city: patientInput.city ?? null
-        },
-        transaction
-      })
-      const patientUpdatePayload = {
-        fullName: patientInput.fullName,
-        phone: patientInput.phone
-      }
-      if ('streetAndNumber' in patientInput) {
-        patientUpdatePayload.streetAndNumber = patientInput.streetAndNumber
-      }
-      if ('city' in patientInput) {
-        patientUpdatePayload.city = patientInput.city
-      }
-      await patient.update(patientUpdatePayload, { transaction })
-
-      const specialty = await Specialty.findByPk(payload.specialtyId, { transaction })
-      if (!specialty) {
-        throw new AppError('Especialidad no encontrada', 404, 'specialty_not_found')
-      }
-
-      let insurance = null
-      if (payload.insuranceId) {
-        insurance = await HealthInsurance.findOne({
-          where: {
-            id: payload.insuranceId,
-            isActive: true
-          },
-          transaction
-        })
-        if (!insurance) {
-          throw new AppError('Obra social no encontrada o inactiva', 404, 'insurance_not_found')
-        }
-      }
-
-      const baseAmount = Number(specialty.fee)
-      const discountPercent = insurance ? Number(insurance.discountPercent) : 0
-      const discountedAmount = Math.max(0, Number((baseAmount - ((baseAmount * discountPercent) / 100)).toFixed(2)))
-      pricing = {
-        baseAmount,
-        discountPercent,
-        finalAmount: discountedAmount
-      }
-
-      appointment = await Appointment.create(
-        {
-          doctorId: payload.doctorId,
-          specialtyId: payload.specialtyId,
-          insuranceId: insurance?.id ?? null,
-          patientId: patient.id,
-          date: payload.date,
-          startTime: payload.startTime,
-          endTime,
-          symptoms: payload.symptoms ?? null,
-          discountPercentApplied: discountPercent,
-          status: 'hold',
-          createdByRole: actorRole,
-          createdByUserId: actorId
-        },
-        { transaction }
-      )
-
-      payment = await Payment.create(
-        {
-          appointmentId: appointment.id,
-          provider: 'mock',
-          amount: discountedAmount,
-          currency: 'ARS',
-          status: 'pending'
-        },
-        { transaction }
-      )
-
-      paymentIntent = createMockPaymentIntent({
-        appointmentId: appointment.id,
-        amount: discountedAmount
-      })
-
-      await writeAuditLog({
-        actorRole,
-        actorId,
-        action: 'APPOINTMENT_CREATED_HOLD',
-        entity: 'Appointment',
-        entityId: appointment.id,
-        meta: {
-          doctorId: payload.doctorId,
-          date: payload.date,
-          startTime: payload.startTime,
-          insuranceId: insurance?.id ?? null,
-          discountPercent
-        },
-        transaction
-      })
-    })
-  } catch (error) {
-    if (error.name === 'SequelizeUniqueConstraintError') {
-      throw new AppError('Ese horario ya no esta disponible', 409, 'slot_conflict')
-    }
-    throw error
-  }
+  const created = await createAppointmentWithHold({
+    payload: req.validated.body,
+    auth: req.auth
+  })
 
   ok(
     res,
-    {
-      appointment,
-      payment,
-      paymentIntent,
-      pricing
-    },
+    created,
     'appointment_created_hold',
     201
   )
@@ -317,19 +154,12 @@ export const listMyAppointments = async (req, res) => {
     throw new AppError('Prohibido', 403, 'forbidden')
   }
   const { query = {} } = req.validated
-  const { page, pageSize, offset, limit } = parsePagination(query)
-
-  const { rows, count } = await Appointment.findAndCountAll({
-    where: {
-      patientId: req.auth.patientId
-    },
-    include: includeDefault,
-    order: [['date', 'DESC'], ['startTime', 'DESC']],
-    offset,
-    limit
+  const { rows, pagination } = await listPatientAppointments({
+    patientId: req.auth.patientId,
+    query
   })
 
-  paginated(res, rows, buildPagination({ page, pageSize, total: count }))
+  paginated(res, rows, pagination)
 }
 
 export const listAppointments = async (req, res) => {
@@ -337,46 +167,17 @@ export const listAppointments = async (req, res) => {
     throw new AppError('Prohibido', 403, 'forbidden')
   }
   const { query = {} } = req.validated
-  const { page, pageSize, offset, limit } = parsePagination(query)
-
-  const where = {}
-  if (req.auth.role === 'doctor') {
-    where.doctorId = req.auth.doctorId
-  }
-  if (query.doctorId && req.auth.role !== 'doctor') where.doctorId = query.doctorId
-  if (query.specialtyId) where.specialtyId = query.specialtyId
-  if (query.status) where.status = query.status
-  if (query.dateFrom || query.dateTo) {
-    where.date = {}
-    if (query.dateFrom) where.date[Op.gte] = query.dateFrom
-    if (query.dateTo) where.date[Op.lte] = query.dateTo
-  }
-
-  const patientWhere = {}
-  if (query.patientDni) {
-    patientWhere.dni = {
-      [Op.iLike]: `%${query.patientDni}%`
-    }
-  }
-
-  const { rows, count } = await Appointment.findAndCountAll({
-    where,
-    include: includeDefault.map((entry) => {
-      if (entry.as === 'patient' && Object.keys(patientWhere).length > 0) {
-        return { ...entry, where: patientWhere }
-      }
-      return entry
-    }),
-    order: [['date', 'DESC'], ['startTime', 'DESC']],
-    offset,
-    limit
+  const { rows, pagination } = await listScopedAppointments({
+    auth: req.auth,
+    query
   })
 
-  paginated(res, rows, buildPagination({ page, pageSize, total: count }))
+  paginated(res, rows, pagination)
 }
 
 export const getAppointmentById = async (req, res) => {
-  const item = await Appointment.findByPk(req.validated.params.id, {
+  const item = await findAppointmentById({
+    appointmentId: req.validated.params.id,
     include: includeDefault
   })
   if (!item) {

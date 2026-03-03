@@ -1,17 +1,14 @@
 import { z } from 'zod'
 import { Patient } from '../db/models/index.js'
-import { AppError } from '../utils/errors.js'
 import { signAccessToken } from '../utils/jwt.js'
 import { ok } from '../utils/response.js'
-
-const normalizeDni = (dni) => String(dni).replace(/\D/g, '')
-const normalizePhone = (phone) => String(phone).replace(/[^\d+]/g, '')
+import { dniSchema, phoneSchema } from '../validators/common.js'
 
 export const patientLoginSchema = z.object({
   body: z.object({
     fullName: z.string().min(3).max(120),
-    dni: z.string().min(6).max(12),
-    phone: z.string().min(8).max(20),
+    dni: dniSchema,
+    phone: phoneSchema,
     streetAndNumber: z.string().min(3).max(160).optional(),
     city: z.string().min(2).max(120).optional()
   }),
@@ -22,26 +19,19 @@ export const patientLoginSchema = z.object({
 export const patientPrefillSchema = z.object({
   body: z.object({}).optional(),
   query: z.object({
-    dni: z.string().min(6).max(12)
+    dni: dniSchema
   }),
   params: z.object({}).optional()
 })
 
 export const loginPatient = async (req, res) => {
   const fullName = req.validated.body.fullName.trim()
-  const dni = normalizeDni(req.validated.body.dni)
-  const phone = normalizePhone(req.validated.body.phone)
+  const dni = req.validated.body.dni
+  const phone = req.validated.body.phone
   const hasStreetAndNumber = typeof req.validated.body.streetAndNumber !== 'undefined'
   const hasCity = typeof req.validated.body.city !== 'undefined'
   const streetAndNumber = hasStreetAndNumber ? req.validated.body.streetAndNumber.trim() : null
   const city = hasCity ? req.validated.body.city.trim() : null
-
-  if (dni.length < 6 || dni.length > 12) {
-    throw new AppError('DNI invalido', 400, 'invalid_dni')
-  }
-  if (phone.length < 8 || phone.length > 20) {
-    throw new AppError('Telefono invalido', 400, 'invalid_phone')
-  }
 
   const [patient] = await Patient.findOrCreate({
     where: { dni },
@@ -93,11 +83,7 @@ export const loginPatient = async (req, res) => {
 }
 
 export const prefillPatientByDni = async (req, res) => {
-  const dni = normalizeDni(req.validated.query.dni)
-
-  if (dni.length < 6 || dni.length > 12) {
-    throw new AppError('DNI invalido', 400, 'invalid_dni')
-  }
+  const dni = req.validated.query.dni
 
   const patient = await Patient.findOne({
     where: { dni },

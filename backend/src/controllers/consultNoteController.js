@@ -3,6 +3,7 @@ import { Appointment, ConsultNote, Doctor, Patient, Specialty, sequelize } from 
 import { AppError } from '../utils/errors.js'
 import { ok } from '../utils/response.js'
 import { writeAuditLog } from '../utils/audit.js'
+import { isoDateSchema } from '../validators/common.js'
 
 const CONSULT_NOTE_EDIT_WINDOW_HOURS = 24
 
@@ -23,7 +24,7 @@ const consultNoteBodyBaseSchema = z.object({
   referred: z.boolean().optional(),
   referralTo: z.string().max(250).optional().nullable(),
   nextSuggestedType: z.enum(['date', 'as_needed']).optional().nullable(),
-  nextSuggestedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable()
+  nextSuggestedDate: isoDateSchema.optional().nullable()
 })
 
 const validateConsultNoteCrossFields = (value, context) => {

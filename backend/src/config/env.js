@@ -4,7 +4,13 @@ import { z } from 'zod'
 const schema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  DATABASE_URL: z.string().min(1, 'DATABASE_URL es requerido'),
+  DATABASE_URL: z.string().optional().default(''),
+  DATABASE_URL_TEST: z.string().optional().default(''),
+  DB_SCHEMA: z.union([
+    z.literal(''),
+    z.string().regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, 'DB_SCHEMA invalido')
+  ]).optional().default(''),
+  DB_BASELINE_ASSUME_APPLIED: z.enum(['true', 'false']).optional().default('false').transform((value) => value === 'true'),
   JWT_ACCESS_SECRET: z.string().min(16, 'JWT_ACCESS_SECRET debe tener al menos 16 caracteres'),
   JWT_REFRESH_SECRET: z.string().min(16, 'JWT_REFRESH_SECRET debe tener al menos 16 caracteres'),
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
@@ -26,7 +32,10 @@ const schema = z.object({
   APPOINTMENT_HOLD_MINUTES: z.coerce.number().int().min(1).max(60).default(10),
   HOLD_EXPIRATION_JOB_INTERVAL_MINUTES: z.coerce.number().int().min(1).max(5).default(1),
   PAYMENT_DEFAULT_CURRENCY: z.string().default('ARS'),
-  PATIENT_MESSAGE_WINDOW_HOURS: z.coerce.number().int().min(1).max(240).default(72)
+  PATIENT_MESSAGE_WINDOW_HOURS: z.coerce.number().int().min(1).max(240).default(72),
+  SENTRY_DSN: z.string().optional().default(''),
+  SENTRY_ENVIRONMENT: z.string().default('development'),
+  SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0)
 })
 
 const parsed = schema.safeParse(process.env)
@@ -36,12 +45,25 @@ if (!parsed.success) {
   throw new Error(`Configuracion invalida:\n${issues}`)
 }
 
+const resolvedDatabaseUrl = parsed.data.NODE_ENV === 'test'
+  ? (parsed.data.DATABASE_URL_TEST || parsed.data.DATABASE_URL)
+  : parsed.data.DATABASE_URL
+
+if (!resolvedDatabaseUrl) {
+  if (parsed.data.NODE_ENV === 'test') {
+    throw new Error('Configuracion invalida: DATABASE_URL_TEST es requerido en NODE_ENV=test')
+  }
+  throw new Error('Configuracion invalida: DATABASE_URL es requerido')
+}
+
 const origins = parsed.data.CORS_ORIGIN.split(',')
   .map((value) => value.trim())
   .filter(Boolean)
 
 export const config = {
   ...parsed.data,
+  DATABASE_URL: resolvedDatabaseUrl,
+  SENTRY_ENVIRONMENT: parsed.data.SENTRY_ENVIRONMENT || parsed.data.NODE_ENV,
   CORS_ORIGINS: origins,
   IS_PROD: parsed.data.NODE_ENV === 'production'
 }

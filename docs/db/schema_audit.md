@@ -1,6 +1,6 @@
 # DB Schema Audit - San Rafael Turnos
 
-Fecha de auditoria (UTC): 2026-03-03T15:18:58.901Z
+Fecha de auditoria (UTC): 2026-03-03T16:54:20.419Z
 
 ## Resumen ejecutivo
 

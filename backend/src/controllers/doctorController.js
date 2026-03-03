@@ -14,11 +14,17 @@ import { ok, paginated } from '../utils/response.js'
 import { parsePagination, buildPagination } from '../utils/pagination.js'
 import { writeAuditLog } from '../utils/audit.js'
 import { parseTimeToMinutes } from '../utils/time.js'
+import {
+  dniSchema,
+  phoneSchema,
+  isoDateSchema,
+  hhmmWithOptionalSecondsSchema
+} from '../validators/common.js'
 
 const availabilityItemSchema = z.object({
   dayOfWeek: z.coerce.number().int().min(0).max(6),
-  startTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
-  endTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
+  startTime: hhmmWithOptionalSecondsSchema,
+  endTime: hhmmWithOptionalSecondsSchema,
   slotMinutes: z.coerce.number().int().min(10).max(120).default(30),
   isActive: z.boolean().default(true)
 })
@@ -47,8 +53,8 @@ export const createDoctorSchema = z.object({
   body: z.object({
     fullName: z.string().min(3).max(120),
     email: z.string().email(),
-    phone: z.string().min(8).max(20),
-    dni: z.string().regex(/^\d{6,12}$/),
+    phone: phoneSchema,
+    dni: dniSchema,
     consultorio: z.coerce.number().int().positive(),
     specialtyId: z.string().uuid(),
     bio: z.string().max(2000).optional(),
@@ -62,8 +68,8 @@ export const updateDoctorSchema = z.object({
   body: z.object({
     fullName: z.string().min(3).max(120).optional(),
     email: z.string().email().optional(),
-    phone: z.string().min(8).max(20).optional(),
-    dni: z.string().regex(/^\d{6,12}$/).optional(),
+    phone: phoneSchema.optional(),
+    dni: dniSchema.optional(),
     consultorio: z.coerce.number().int().positive().optional(),
     specialtyId: z.string().uuid().optional(),
     bio: z.string().max(2000).optional().nullable(),
@@ -87,9 +93,9 @@ export const updateAvailabilitySchema = z.object({
 
 export const createBlockSchema = z.object({
   body: z.object({
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    startTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
-    endTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
+    date: isoDateSchema,
+    startTime: hhmmWithOptionalSecondsSchema,
+    endTime: hhmmWithOptionalSecondsSchema,
     reason: z.string().max(250).optional()
   }),
   query: z.object({}).optional(),

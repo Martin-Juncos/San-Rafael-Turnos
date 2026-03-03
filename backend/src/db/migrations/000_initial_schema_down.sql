@@ -1,0 +1,27 @@
+DROP TABLE IF EXISTS "PaymentWebhookEvent";
+DROP TABLE IF EXISTS "Message";
+DROP TABLE IF EXISTS "ConsultNote";
+DROP TABLE IF EXISTS "Payment";
+DROP TABLE IF EXISTS "Appointment";
+DROP TABLE IF EXISTS "DoctorBlock";
+DROP TABLE IF EXISTS "DoctorAvailability";
+DROP TABLE IF EXISTS "RefreshToken";
+DROP TABLE IF EXISTS "PatientOtp";
+DROP TABLE IF EXISTS "AuditLog";
+DROP TABLE IF EXISTS "User";
+DROP TABLE IF EXISTS "Doctor";
+DROP TABLE IF EXISTS "Patient";
+DROP TABLE IF EXISTS "HealthInsurance";
+DROP TABLE IF EXISTS "Specialty";
+
+DROP TYPE IF EXISTS "enum_ConsultNote_nextSuggestedType";
+DROP TYPE IF EXISTS "enum_ConsultNote_statusFinal";
+DROP TYPE IF EXISTS "enum_Message_senderRole";
+DROP TYPE IF EXISTS "enum_PaymentWebhookEvent_provider";
+DROP TYPE IF EXISTS "enum_Payment_status";
+DROP TYPE IF EXISTS "enum_Payment_provider";
+DROP TYPE IF EXISTS "enum_Appointment_createdByRole";
+DROP TYPE IF EXISTS "enum_Appointment_status";
+DROP TYPE IF EXISTS "enum_DoctorBlock_createdByRole";
+DROP TYPE IF EXISTS "enum_User_accountType";
+DROP TYPE IF EXISTS "enum_User_role";

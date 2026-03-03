@@ -6,9 +6,7 @@ import { AppError } from '../utils/errors.js'
 import { ok, paginated } from '../utils/response.js'
 import { parsePagination, buildPagination } from '../utils/pagination.js'
 import { writeAuditLog } from '../utils/audit.js'
-
-const normalizeDni = (value) => String(value || '').replace(/\D/g, '')
-const normalizePhone = (value) => String(value || '').replace(/[^\d+]/g, '')
+import { dniSchema, phoneSchema, normalizeDni, normalizePhone } from '../validators/common.js'
 
 export const listSecretariesSchema = z.object({
   body: z.object({}).optional(),
@@ -26,8 +24,8 @@ export const createSecretarySchema = z.object({
   body: z.object({
     fullName: z.string().min(3).max(120),
     email: z.string().email(),
-    phone: z.string().min(8).max(20),
-    dni: z.string().regex(/^\d{6,12}$/),
+    phone: phoneSchema,
+    dni: dniSchema,
     doctorId: z.string().uuid(),
     isActive: z.boolean().optional()
   }),
@@ -47,8 +45,8 @@ export const updateSecretarySchema = z.object({
   body: z.object({
     fullName: z.string().min(3).max(120).optional(),
     email: z.string().email().optional(),
-    phone: z.string().min(8).max(20).optional(),
-    dni: z.string().regex(/^\d{6,12}$/).optional(),
+    phone: phoneSchema.optional(),
+    dni: dniSchema.optional(),
     doctorId: z.string().uuid().optional(),
     isActive: z.boolean().optional()
   }).refine((value) => Object.keys(value).length > 0, 'Sin campos para actualizar'),

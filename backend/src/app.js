@@ -4,7 +4,7 @@ import helmet from 'helmet'
 import swaggerUi from 'swagger-ui-express'
 import { config } from './config/env.js'
 import { requestIdMiddleware } from './middlewares/requestId.js'
-import { httpLogger } from './middlewares/httpLogger.js'
+import { httpLogger, requestLogMiddleware } from './middlewares/httpLogger.js'
 import { globalLimiter } from './middlewares/rateLimiters.js'
 import { notFoundHandler, errorHandler } from './middlewares/errorHandler.js'
 import { openapiDocument } from './docs/openapi.js'
@@ -23,6 +23,7 @@ app.use(
 )
 app.use(express.json({ limit: '1mb' }))
 app.use(globalLimiter)
+app.use(requestLogMiddleware)
 
 app.get('/health', (_req, res) => {
   res.json({

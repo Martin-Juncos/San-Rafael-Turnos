@@ -4,6 +4,7 @@ import { validate } from '../middlewares/validate.js'
 import { optionalAuthenticateJwt } from '../middlewares/optionalAuthenticateJwt.js'
 import { authenticateJwt } from '../middlewares/authenticateJwt.js'
 import { requireRoles } from '../middlewares/requireRoles.js'
+import { requireDoctorOwnershipByParam } from '../middlewares/requireOwnership.js'
 import {
   listDoctors,
   getDoctorById,
@@ -36,6 +37,7 @@ router.get(
   '/:id/availability',
   authenticateJwt,
   validate(doctorIdParamSchema),
+  requireDoctorOwnershipByParam(),
   asyncHandler(getDoctorAvailability)
 )
 router.put(

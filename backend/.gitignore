@@ -5,6 +5,4 @@ coverage
 .env.local
 .env.production
 *.log
-.env.example
-tests
 package-lock.json
