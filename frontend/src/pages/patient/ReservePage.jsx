@@ -33,12 +33,6 @@ const paymentStatusLabels = {
   refunded: 'Reintegrado'
 }
 
-const MOCK_PAYMENT_CREDENTIALS = {
-  cardNumber: '4509953566233704',
-  expiry: '11/30',
-  cvv: '123'
-}
-
 const toLocalIsoDate = (date = new Date()) => {
   const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000))
   return local.toISOString().slice(0, 10)
@@ -67,8 +61,7 @@ export function ReservePage () {
   const [success, setSuccess] = useState('')
   const [holdResult, setHoldResult] = useState(null)
   const [patientAppointments, setPatientAppointments] = useState([])
-  const [showCheckout, setShowCheckout] = useState(false)
-  const [paymentLoading, setPaymentLoading] = useState(false)
+  const [checkingMercadoPago, setCheckingMercadoPago] = useState(false)
   const [mercadoPagoLoading, setMercadoPagoLoading] = useState(false)
   const [paymentError, setPaymentError] = useState('')
   const [feedbackModal, setFeedbackModal] = useState({
@@ -77,13 +70,8 @@ export function ReservePage () {
     title: '',
     description: ''
   })
-  const [paymentForm, setPaymentForm] = useState({
-    cardNumber: '',
-    cardHolder: '',
-    expiry: '',
-    cvv: ''
-  })
   const summaryRef = useRef(null)
+  const webhookPaidNotifiedRef = useRef(false)
   const isPatientRole = auth.role === 'patient'
   const isStaffBooking = ['admin', 'clinic', 'doctor'].includes(auth.role)
 
@@ -420,7 +408,6 @@ export function ReservePage () {
           pricing: prev?.pricing ?? null
         }))
         await loadPatientAppointments()
-        setShowCheckout(false)
 
         if (payment.status === 'paid') {
           setSuccess('Pago aprobado y validado. Tu turno quedo confirmado.')
@@ -447,6 +434,56 @@ export function ReservePage () {
       isCancelled = true
     }
   }, [auth.role, location.search, loadPatientAppointments])
+
+  useEffect(() => {
+    if (auth.role !== 'patient') return
+    if (!holdResult?.appointment?.id) return
+    if (holdResult?.payment?.status !== 'pending') return
+
+    let isCancelled = false
+
+    const refreshPaymentStatus = async () => {
+      setCheckingMercadoPago(true)
+      try {
+        const [appointment, payment] = await Promise.all([
+          appointmentsService.getById(holdResult.appointment.id),
+          paymentsService.getByAppointment(holdResult.appointment.id)
+        ])
+        if (isCancelled) return
+
+        setHoldResult((prev) => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            appointment,
+            payment
+          }
+        })
+
+        if (payment.status === 'paid' && !webhookPaidNotifiedRef.current) {
+          webhookPaidNotifiedRef.current = true
+          setSuccess('Pago aprobado y validado por Mercado Pago. Tu turno quedo confirmado.')
+          await loadPatientAppointments()
+        }
+      } catch (_apiError) {
+        // Best effort: we keep the page usable even if a polling tick fails.
+      } finally {
+        if (!isCancelled) {
+          setCheckingMercadoPago(false)
+        }
+      }
+    }
+
+    refreshPaymentStatus().catch(() => {})
+    const intervalId = window.setInterval(() => {
+      refreshPaymentStatus().catch(() => {})
+    }, 5000)
+
+    return () => {
+      isCancelled = true
+      window.clearInterval(intervalId)
+    }
+  }, [auth.role, holdResult?.appointment?.id, holdResult?.payment?.status, loadPatientAppointments])
 
   const createHold = async () => {
     setError('')
@@ -502,21 +539,12 @@ export function ReservePage () {
       const data = await appointmentsService.create(payload)
       setHoldResult(data)
       await loadPatientAppointments()
-      setShowCheckout(true)
+      webhookPaidNotifiedRef.current = false
       setPaymentError('')
-      setSuccess('La reserva se creo correctamente. Ahora debes completar el pago para confirmar el turno.')
+      setSuccess('La reserva se creo correctamente. Ahora completa el pago con Mercado Pago para confirmar el turno.')
     } catch (apiError) {
       setError(apiError.message)
     }
-  }
-
-  const openCheckout = () => {
-    if (!holdResult?.appointment?.id) {
-      setError('Primero debes reservar el turno para habilitar el pago.')
-      return
-    }
-    setPaymentError('')
-    setShowCheckout(true)
   }
 
   const startMercadoPagoCheckout = async () => {
@@ -527,6 +555,7 @@ export function ReservePage () {
 
     setError('')
     setPaymentError('')
+    webhookPaidNotifiedRef.current = false
     setMercadoPagoLoading(true)
     try {
       const preference = await paymentsService.createMercadoPagoPreference(holdResult.appointment.id)
@@ -539,72 +568,6 @@ export function ReservePage () {
       setError(apiError.message || 'No se pudo iniciar Mercado Pago.')
     } finally {
       setMercadoPagoLoading(false)
-    }
-  }
-
-  const formatCardNumber = (value) => {
-    const digits = value.replace(/\D/g, '').slice(0, 16)
-    return digits.replace(/(\d{4})(?=\d)/g, '$1 ').trim()
-  }
-
-  const formatExpiry = (value) => {
-    const digits = value.replace(/\D/g, '').slice(0, 4)
-    if (digits.length <= 2) return digits
-    return `${digits.slice(0, 2)}/${digits.slice(2)}`
-  }
-
-  const confirmPayment = async () => {
-    if (!holdResult?.appointment?.id) return
-    setError('')
-    setSuccess('')
-    setPaymentError('')
-
-    const normalizedCard = paymentForm.cardNumber.replace(/\D/g, '')
-    const normalizedCvv = paymentForm.cvv.replace(/\D/g, '')
-    const normalizedExpiry = paymentForm.expiry
-
-    if (!paymentForm.cardHolder.trim() || normalizedCard.length !== 16 || !/^\d{2}\/\d{2}$/.test(normalizedExpiry) || normalizedCvv.length !== 3) {
-      setPaymentError('Completa los datos de tarjeta de prueba para continuar.')
-      return
-    }
-
-    if (
-      normalizedCard !== MOCK_PAYMENT_CREDENTIALS.cardNumber ||
-      normalizedExpiry !== MOCK_PAYMENT_CREDENTIALS.expiry ||
-      normalizedCvv !== MOCK_PAYMENT_CREDENTIALS.cvv
-    ) {
-      setPaymentError('Credenciales de prueba invalidas. Usa los datos sugeridos en pantalla.')
-      return
-    }
-
-    setPaymentLoading(true)
-    try {
-      const payment = await paymentsService.confirmMock(holdResult.appointment.id)
-      setHoldResult((prev) => {
-        if (!prev) return prev
-        return {
-          ...prev,
-          appointment: {
-            ...prev.appointment,
-            status: 'confirmed'
-          },
-          payment
-        }
-      })
-      setShowCheckout(false)
-      setPaymentForm({
-        cardNumber: '',
-        cardHolder: '',
-        expiry: '',
-        cvv: ''
-      })
-      await loadPatientAppointments()
-      setSuccess('Pago aprobado. Tu turno quedo confirmado y ya figura en tu panel.')
-      summaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    } catch (apiError) {
-      setPaymentError(apiError.message)
-    } finally {
-      setPaymentLoading(false)
     }
   }
 
@@ -898,65 +861,30 @@ export function ReservePage () {
                 )}
           </div>
 
-          <div className='grid gap-2 sm:grid-cols-3'>
+          <div className='grid gap-2 sm:grid-cols-2'>
             <Button onClick={createHold} disabled={!form.startTime}>Reservar turno (pendiente de pago)</Button>
-            <Button variant='secondary' onClick={openCheckout} disabled={!holdResult?.appointment?.id}>
-              Pagar (demo)
-            </Button>
             <Button
               variant='secondary'
               onClick={startMercadoPagoCheckout}
-              disabled={!holdResult?.appointment?.id || mercadoPagoLoading}
+              disabled={
+                !isPatientRole ||
+                !holdResult?.appointment?.id ||
+                mercadoPagoLoading ||
+                holdResult?.payment?.status === 'paid'
+              }
             >
-              {mercadoPagoLoading ? 'Redirigiendo...' : 'Mercado Pago (sandbox)'}
+              {mercadoPagoLoading ? 'Redirigiendo...' : 'Pagar con Mercado Pago (sandbox)'}
             </Button>
           </div>
 
-          {showCheckout && holdResult?.appointment?.id ? (
-            <div className='space-y-3 rounded-xl border border-brand-200 bg-brand-50/70 p-3'>
-              <p className='text-sm font-semibold text-brand-900'>Pago de prueba (desarrollo)</p>
-              <p className='text-xs text-brand-900/80'>
-                Usa estas credenciales ficticias para aprobar:
-                {' '}Tarjeta <strong>4509 9535 6623 3704</strong>,
-                {' '}Vencimiento <strong>11/30</strong>,
-                {' '}CVV <strong>123</strong>.
+          {holdResult?.appointment?.id && holdResult?.payment?.status === 'pending'
+            ? (
+              <p className='text-xs text-emerald-900/75'>
+                El turno queda confirmado solo cuando Mercado Pago envie un webhook valido y el backend verifique el pago.
+                {checkingMercadoPago ? ' Verificando estado...' : ''}
               </p>
-              <div className='grid gap-3 sm:grid-cols-2'>
-                <Input
-                  label='Numero de tarjeta'
-                  value={paymentForm.cardNumber}
-                  onChange={(event) => setPaymentForm((prev) => ({ ...prev, cardNumber: formatCardNumber(event.target.value) }))}
-                  placeholder='4509 9535 6623 3704'
-                />
-                <Input
-                  label='Titular'
-                  value={paymentForm.cardHolder}
-                  onChange={(event) => setPaymentForm((prev) => ({ ...prev, cardHolder: event.target.value }))}
-                  placeholder='Paciente Demo'
-                />
-                <Input
-                  label='Vencimiento (MM/AA)'
-                  value={paymentForm.expiry}
-                  onChange={(event) => setPaymentForm((prev) => ({ ...prev, expiry: formatExpiry(event.target.value) }))}
-                  placeholder='11/30'
-                />
-                <Input
-                  label='CVV'
-                  value={paymentForm.cvv}
-                  onChange={(event) => setPaymentForm((prev) => ({ ...prev, cvv: event.target.value.replace(/\D/g, '').slice(0, 3) }))}
-                  placeholder='123'
-                />
-              </div>
-              <div className='flex flex-wrap gap-2'>
-                <Button onClick={confirmPayment} disabled={paymentLoading}>
-                  {paymentLoading ? 'Procesando pago...' : 'Pagar ahora'}
-                </Button>
-                <Button variant='secondary' onClick={() => setShowCheckout(false)} disabled={paymentLoading}>
-                  Cancelar
-                </Button>
-              </div>
-            </div>
-          ) : null}
+              )
+            : null}
 
           {!auth.token && (
             <p className='text-xs text-amber-700'>

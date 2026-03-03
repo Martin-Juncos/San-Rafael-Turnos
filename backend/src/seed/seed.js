@@ -62,7 +62,6 @@ const upsertParanoid = async (Model, where, values) => {
 const run = async () => {
   try {
     await sequelize.authenticate()
-    await sequelize.sync({ alter: true })
 
     const clinicaGeneral = await upsertParanoid(
       Specialty,

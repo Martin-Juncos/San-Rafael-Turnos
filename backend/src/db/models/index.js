@@ -48,24 +48,49 @@ export const initModels = () => {
   DoctorBlock.belongsTo(Doctor, { foreignKey: 'doctorId', as: 'doctor' })
 
   Doctor.hasMany(Appointment, { foreignKey: 'doctorId', as: 'appointments' })
-  Appointment.belongsTo(Doctor, { foreignKey: 'doctorId', as: 'doctor' })
+  Appointment.belongsTo(Doctor, {
+    foreignKey: 'doctorId',
+    as: 'doctor',
+    onDelete: 'RESTRICT',
+    onUpdate: 'CASCADE'
+  })
 
   Specialty.hasMany(Appointment, { foreignKey: 'specialtyId', as: 'appointments' })
-  Appointment.belongsTo(Specialty, { foreignKey: 'specialtyId', as: 'specialty' })
+  Appointment.belongsTo(Specialty, {
+    foreignKey: 'specialtyId',
+    as: 'specialty',
+    onDelete: 'RESTRICT',
+    onUpdate: 'CASCADE'
+  })
 
   HealthInsurance.hasMany(Appointment, { foreignKey: 'insuranceId', as: 'appointments' })
   Appointment.belongsTo(HealthInsurance, { foreignKey: 'insuranceId', as: 'insurance' })
 
   Patient.hasMany(Appointment, { foreignKey: 'patientId', as: 'appointments' })
-  Appointment.belongsTo(Patient, { foreignKey: 'patientId', as: 'patient' })
+  Appointment.belongsTo(Patient, {
+    foreignKey: 'patientId',
+    as: 'patient',
+    onDelete: 'RESTRICT',
+    onUpdate: 'CASCADE'
+  })
 
   Appointment.hasOne(Payment, { foreignKey: 'appointmentId', as: 'payment' })
-  Payment.belongsTo(Appointment, { foreignKey: 'appointmentId', as: 'appointment' })
+  Payment.belongsTo(Appointment, {
+    foreignKey: 'appointmentId',
+    as: 'appointment',
+    onDelete: 'RESTRICT',
+    onUpdate: 'CASCADE'
+  })
   Payment.hasMany(PaymentWebhookEvent, { foreignKey: 'paymentId', as: 'webhookEvents' })
   PaymentWebhookEvent.belongsTo(Payment, { foreignKey: 'paymentId', as: 'payment' })
 
   Appointment.hasMany(Message, { foreignKey: 'appointmentId', as: 'messages' })
-  Message.belongsTo(Appointment, { foreignKey: 'appointmentId', as: 'appointment' })
+  Message.belongsTo(Appointment, {
+    foreignKey: 'appointmentId',
+    as: 'appointment',
+    onDelete: 'RESTRICT',
+    onUpdate: 'CASCADE'
+  })
 
   Appointment.hasOne(ConsultNote, { foreignKey: 'appointmentId', as: 'consultNote' })
   ConsultNote.belongsTo(Appointment, { foreignKey: 'appointmentId', as: 'appointment' })

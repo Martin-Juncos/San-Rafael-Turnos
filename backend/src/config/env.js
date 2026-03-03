@@ -5,7 +5,6 @@ const schema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL es requerido'),
-  DB_SYNC: z.coerce.boolean().default(true),
   JWT_ACCESS_SECRET: z.string().min(16, 'JWT_ACCESS_SECRET debe tener al menos 16 caracteres'),
   JWT_REFRESH_SECRET: z.string().min(16, 'JWT_REFRESH_SECRET debe tener al menos 16 caracteres'),
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
@@ -25,6 +24,7 @@ const schema = z.object({
   NEWS_MAX_ITEMS: z.coerce.number().int().min(5).max(50).default(30),
   OTP_TTL_SECONDS: z.coerce.number().int().min(60).max(1800).default(300),
   APPOINTMENT_HOLD_MINUTES: z.coerce.number().int().min(1).max(60).default(10),
+  HOLD_EXPIRATION_JOB_INTERVAL_MINUTES: z.coerce.number().int().min(1).max(5).default(1),
   PAYMENT_DEFAULT_CURRENCY: z.string().default('ARS'),
   PATIENT_MESSAGE_WINDOW_HOURS: z.coerce.number().int().min(1).max(240).default(72)
 })

@@ -1,24 +1,12 @@
 import { Op } from 'sequelize'
 import { z } from 'zod'
-import { HealthInsurance, sequelize } from '../db/models/index.js'
+import { HealthInsurance } from '../db/models/index.js'
 import { AppError } from '../utils/errors.js'
 import { ok, paginated } from '../utils/response.js'
 import { parsePagination, buildPagination } from '../utils/pagination.js'
 import { writeAuditLog } from '../utils/audit.js'
-import { logger } from '../config/logger.js'
-import { ensureHealthInsuranceUniquenessRule } from '../db/healthInsuranceConstraints.js'
 
 const normalizeInsuranceName = (value) => String(value ?? '').trim().replace(/\s+/g, ' ')
-let insuranceUniquenessEnsured = false
-
-const ensureInsuranceUniquenessRule = async () => {
-  if (insuranceUniquenessEnsured) {
-    return
-  }
-
-  await ensureHealthInsuranceUniquenessRule(sequelize)
-  insuranceUniquenessEnsured = true
-}
 
 export const listInsurancesSchema = z.object({
   body: z.object({}).optional(),
@@ -87,12 +75,6 @@ export const listInsurances = async (req, res) => {
 }
 
 export const createInsurance = async (req, res) => {
-  try {
-    await ensureInsuranceUniquenessRule()
-  } catch (error) {
-    logger.warn({ err: error }, 'insurance-uniqueness-rule-not-applied')
-  }
-
   const payload = {
     ...req.validated.body,
     name: normalizeInsuranceName(req.validated.body.name)
@@ -156,12 +138,6 @@ export const createInsurance = async (req, res) => {
 }
 
 export const updateInsurance = async (req, res) => {
-  try {
-    await ensureInsuranceUniquenessRule()
-  } catch (error) {
-    logger.warn({ err: error }, 'insurance-uniqueness-rule-not-applied')
-  }
-
   const item = await HealthInsurance.findByPk(req.validated.params.id)
   if (!item) {
     throw new AppError('Obra social no encontrada', 404, 'insurance_not_found')

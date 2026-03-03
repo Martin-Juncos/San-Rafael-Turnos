@@ -13,5 +13,11 @@ backend/dev.sqlite
 .codex/
 CHANGELOG.md
 CONFIG.md
-docs/
+/docs/
+!/docs/
+/docs/*
+!/docs/db/
+/docs/db/*
+!/docs/db/schema_audit.md
+backend/src/docs/
 .vscode

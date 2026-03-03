@@ -326,6 +326,13 @@ export const createMercadoPagoPreferenceForAppointment = async (req, res) => {
   if (req.auth.role !== 'patient') {
     throw new AppError('Prohibido', 403, 'forbidden')
   }
+  if (!config.MERCADOPAGO_ACCESS_TOKEN) {
+    throw new AppError(
+      'Mercado Pago no esta configurado. Falta MERCADOPAGO_ACCESS_TOKEN en backend/.env',
+      400,
+      'mercadopago_not_configured'
+    )
+  }
 
   const appointment = await Appointment.findByPk(req.validated.body.appointmentId, {
     include: appointmentWithPaymentInclude

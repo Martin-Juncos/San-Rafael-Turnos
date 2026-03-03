@@ -64,7 +64,7 @@ npm install
 3. Ejecuta migracion y seed (desde `backend/`):
 
 ```bash
-npm run migrate
+npm run db:migrate
 npm run seed
 ```
 
@@ -101,9 +101,12 @@ npm run dev
 - `npm run dev`
 - `npm run start`
 - `npm run migrate`
+- `npm run db:migrate`
+- `npm run db:rollback`
 - `npm run seed`
 - `npm run lint`
 - `npm run test`
+- `npm run audit:db-schema`
 
 ### Frontend (`frontend/`)
 

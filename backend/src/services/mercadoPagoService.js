@@ -38,9 +38,10 @@ export const createMercadoPagoPreference = async (payload) => {
 
   const data = await parseJsonSafe(response)
   if (!response.ok) {
+    const normalizedStatus = response.status >= 500 ? 502 : 400
     throw new AppError(
       data?.message || 'No se pudo crear la preferencia de pago',
-      502,
+      normalizedStatus,
       'mercadopago_preference_error'
     )
   }
@@ -58,9 +59,10 @@ export const getMercadoPagoPaymentById = async (paymentId) => {
 
   const data = await parseJsonSafe(response)
   if (!response.ok) {
+    const normalizedStatus = response.status >= 500 ? 502 : 400
     throw new AppError(
       data?.message || 'No se pudo consultar el estado del pago',
-      502,
+      normalizedStatus,
       'mercadopago_payment_lookup_error'
     )
   }

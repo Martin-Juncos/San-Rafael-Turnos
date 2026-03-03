@@ -1,0 +1,26 @@
+npm WARN exec The following package was not found and will be installed: localtunnel@2.0.2
+npm WARN cleanup Failed to remove some directories [
+npm WARN cleanup   [
+npm WARN cleanup     undefined,
+npm WARN cleanup     TypeError [ERR_INVALID_ARG_TYPE]: The "path" argument must be of type string or an instance of Buffer or URL. Received undefined
+npm WARN cleanup         at rm (node:internal/fs/promises:809:10)
+npm WARN cleanup         at C:\Users\Usuario\AppData\Roaming\npm\node_modules\npm\node_modules\@npmcli\arborist\lib\arborist\reify.js:553:20
+npm WARN cleanup         at Array.map (<anonymous>)
+npm WARN cleanup         at [rollbackCreateSparseTree] (C:\Users\Usuario\AppData\Roaming\npm\node_modules\npm\node_modules\@npmcli\arborist\lib\arborist\reify.js:553:8)
+npm WARN cleanup         at [reifyPackages] (C:\Users\Usuario\AppData\Roaming\npm\node_modules\npm\node_modules\@npmcli\arborist\lib\arborist\reify.js:256:31)
+npm WARN cleanup         at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+npm WARN cleanup         at async Arborist.reify (C:\Users\Usuario\AppData\Roaming\npm\node_modules\npm\node_modules\@npmcli\arborist\lib\arborist\reify.js:170:5)
+npm WARN cleanup         at async exec (C:\Users\Usuario\AppData\Roaming\npm\node_modules\npm\node_modules\libnpmexec\lib\index.js:264:7)
+npm WARN cleanup         at async module.exports (C:\Users\Usuario\AppData\Roaming\npm\node_modules\npm\lib\cli.js:134:5) {
+npm WARN cleanup       code: 'ERR_INVALID_ARG_TYPE'
+npm WARN cleanup     }
+npm WARN cleanup   ]
+npm WARN cleanup ]
+npm ERR! code ENOTEMPTY
+npm ERR! syscall rmdir
+npm ERR! path C:\Users\Usuario\AppData\Local\npm-cache\_npx\75ac80b86e83d4a2\node_modules\axios\dist
+npm ERR! errno -4051
+npm ERR! ENOTEMPTY: directory not empty, rmdir 'C:\Users\Usuario\AppData\Local\npm-cache\_npx\75ac80b86e83d4a2\node_modules\axios\dist'
+
+npm ERR! A complete log of this run can be found in:
+npm ERR!     C:\Users\Usuario\AppData\Local\npm-cache\_logs\2026-03-02T16_03_27_191Z-debug-0.log
