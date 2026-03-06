@@ -20,4 +20,7 @@ CONFIG.md
 /docs/db/*
 !/docs/db/schema_audit.md
 backend/src/docs/
+!backend/src/docs/
+backend/src/docs/*
+!backend/src/docs/openapi.js
 .vscode
