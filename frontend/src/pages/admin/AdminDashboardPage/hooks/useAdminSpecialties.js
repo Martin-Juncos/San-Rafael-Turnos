@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { specialtiesService } from '../../../../api/services'
 
 export function useAdminSpecialties () {
   const [specialties, setSpecialties] = useState([])
   const [loadingSpecialties, setLoadingSpecialties] = useState(false)
 
-  const loadSpecialties = async () => {
+  const loadSpecialties = useCallback(async () => {
     setLoadingSpecialties(true)
     try {
       const result = await specialtiesService.list({ pageSize: 100, isActive: 'true' })
@@ -14,7 +14,7 @@ export function useAdminSpecialties () {
     } finally {
       setLoadingSpecialties(false)
     }
-  }
+  }, [])
 
   return {
     specialties,
@@ -22,4 +22,3 @@ export function useAdminSpecialties () {
     loadSpecialties
   }
 }
-

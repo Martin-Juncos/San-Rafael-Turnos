@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { insurancesService } from '../../../../api/services'
 
 export function useAdminInsurances () {
   const [insurances, setInsurances] = useState([])
   const [loadingInsurances, setLoadingInsurances] = useState(false)
 
-  const loadInsurances = async () => {
+  const loadInsurances = useCallback(async () => {
     setLoadingInsurances(true)
     try {
       const result = await insurancesService.list({ pageSize: 100 })
@@ -14,7 +14,7 @@ export function useAdminInsurances () {
     } finally {
       setLoadingInsurances(false)
     }
-  }
+  }, [])
 
   return {
     insurances,
@@ -22,4 +22,3 @@ export function useAdminInsurances () {
     loadInsurances
   }
 }
-

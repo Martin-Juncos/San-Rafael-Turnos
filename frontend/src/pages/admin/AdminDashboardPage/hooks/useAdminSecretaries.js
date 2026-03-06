@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { secretariesService } from '../../../../api/services'
 
 export function useAdminSecretaries () {
   const [secretaries, setSecretaries] = useState([])
   const [loadingSecretaries, setLoadingSecretaries] = useState(false)
 
-  const loadSecretaries = async () => {
+  const loadSecretaries = useCallback(async () => {
     setLoadingSecretaries(true)
     try {
       const result = await secretariesService.list({ pageSize: 100 })
@@ -14,7 +14,7 @@ export function useAdminSecretaries () {
     } finally {
       setLoadingSecretaries(false)
     }
-  }
+  }, [])
 
   return {
     secretaries,
@@ -22,4 +22,3 @@ export function useAdminSecretaries () {
     loadSecretaries
   }
 }
-

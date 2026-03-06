@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { doctorsService } from '../../../../api/services'
 
 export function useAdminDoctors () {
   const [doctors, setDoctors] = useState([])
   const [loadingDoctors, setLoadingDoctors] = useState(false)
 
-  const loadDoctors = async () => {
+  const loadDoctors = useCallback(async () => {
     setLoadingDoctors(true)
     try {
       const result = await doctorsService.list({ pageSize: 100 })
@@ -14,7 +14,7 @@ export function useAdminDoctors () {
     } finally {
       setLoadingDoctors(false)
     }
-  }
+  }, [])
 
   return {
     doctors,
@@ -22,4 +22,3 @@ export function useAdminDoctors () {
     loadDoctors
   }
 }
-
