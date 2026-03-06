@@ -1,8 +1,10 @@
 import { existsSync, readdirSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 
-const cwd = process.cwd()
+const scriptFilePath = fileURLToPath(import.meta.url)
+const packageDir = resolve(scriptFilePath, '..', '..')
 const mode = process.argv[2]
 const extraArgs = process.argv.slice(3)
 
@@ -22,7 +24,7 @@ const listFiles = (dirPath, recursive = false) => {
     }
 
     if (entry.isFile() && isTestFile(entry.name)) {
-      files.push(relative(cwd, fullPath).replaceAll('\\', '/'))
+      files.push(relative(packageDir, fullPath).replaceAll('\\', '/'))
     }
   }
 
@@ -32,9 +34,9 @@ const listFiles = (dirPath, recursive = false) => {
 let targetFiles = []
 
 if (mode === 'unit') {
-  targetFiles = listFiles(resolve(cwd, 'tests'), false)
+  targetFiles = listFiles(resolve(packageDir, 'tests'), false)
 } else if (mode === 'integration') {
-  const integrationDir = resolve(cwd, 'tests', 'integration')
+  const integrationDir = resolve(packageDir, 'tests', 'integration')
   if (existsSync(integrationDir)) {
     targetFiles = listFiles(integrationDir, true)
   }
@@ -53,7 +55,7 @@ const result = spawnSync(
   ['--test', ...extraArgs, ...targetFiles],
   {
     stdio: 'inherit',
-    cwd
+    cwd: packageDir
   }
 )
 
