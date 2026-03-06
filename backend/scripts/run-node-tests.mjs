@@ -1,5 +1,5 @@
-import { readdirSync, statSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { existsSync, readdirSync } from 'node:fs'
+import { join, relative, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 
 const cwd = process.cwd()
@@ -22,7 +22,7 @@ const listFiles = (dirPath, recursive = false) => {
     }
 
     if (entry.isFile() && isTestFile(entry.name)) {
-      files.push(fullPath)
+      files.push(relative(cwd, fullPath).replaceAll('\\', '/'))
     }
   }
 
@@ -35,7 +35,7 @@ if (mode === 'unit') {
   targetFiles = listFiles(resolve(cwd, 'tests'), false)
 } else if (mode === 'integration') {
   const integrationDir = resolve(cwd, 'tests', 'integration')
-  if (statSync(integrationDir, { throwIfNoEntry: false })?.isDirectory()) {
+  if (existsSync(integrationDir)) {
     targetFiles = listFiles(integrationDir, true)
   }
 } else {
