@@ -2,7 +2,7 @@
 
 Sistema web de turnos online para la Clinica San Rafael Arcangel con pagos mock, confirmacion por WhatsApp mock y paneles por rol.
 
-## Estado
+## Estados
 
 - Version: `0.1.0` (MVP)
 - Fecha: `2026-02-24`
