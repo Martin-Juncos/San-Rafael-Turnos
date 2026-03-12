@@ -3,10 +3,11 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import { validate } from '../middlewares/validate.js'
 import { authenticateJwt } from '../middlewares/authenticateJwt.js'
 import { requireRoles } from '../middlewares/requireRoles.js'
-import { paymentsLimiter } from '../middlewares/rateLimiters.js'
+import { paymentsLimiter, webhookLimiter } from '../middlewares/rateLimiters.js'
 import {
   confirmMockPayment,
   createMercadoPagoPreferenceForAppointment,
+  receiveMercadoPagoWebhook,
   syncMercadoPagoPayment,
   getPaymentByAppointment,
   updatePaymentStatusByAppointment,
@@ -19,6 +20,7 @@ import {
 
 const router = Router()
 
+router.post('/mercadopago/webhook', webhookLimiter, asyncHandler(receiveMercadoPagoWebhook))
 router.post('/mock/confirm', paymentsLimiter, authenticateJwt, requireRoles('patient'), validate(confirmMockPaymentSchema), asyncHandler(confirmMockPayment))
 router.post(
   '/mercadopago/preference',
