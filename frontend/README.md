@@ -6,15 +6,15 @@ Aplicacion React (Vite) para el portal de turnos y paneles por rol.
 
 ```text
 src/
-  app/                  # store Redux y rutas de aplicacion
-  api/                  # wrappers de compatibilidad (legacy imports)
-  components/           # componentes de layout/public/ui
-  data/                 # datos estaticos
-  features/             # slices de Redux y manejo de sesion
-  hooks/                # hooks reutilizables
-  pages/                # pantallas por dominio/rol
-  services/api/         # cliente HTTP central + servicios por recurso
-  styles/               # estilos globales
+  app/
+  api/
+  components/
+  data/
+  features/
+  hooks/
+  pages/
+  services/api/
+  styles/
 ```
 
 ## Variables de entorno
@@ -26,10 +26,13 @@ URL base del backend (`http://localhost:4000/api` por defecto).
 `true|false`. Activa `withCredentials` para flujos con cookies.
 
 `VITE_API_TIMEOUT_MS`:
-timeout global HTTP en milisegundos (por defecto `12000`).
+Timeout global HTTP en milisegundos (por defecto `12000`).
 
 `VITE_API_RETRY_COUNT`:
-reintentos automáticos para requests idempotentes (`GET/HEAD/OPTIONS`, por defecto `1`).
+Reintentos automaticos para requests idempotentes (`GET/HEAD/OPTIONS`, por defecto `1`).
+
+`VITE_MERCADOPAGO_PUBLIC_KEY`:
+Clave publica usada por `@mercadopago/sdk-react` para renderizar el `Wallet`.
 
 ## Comandos
 
@@ -47,14 +50,22 @@ genera build de produccion.
 
 ## Decisiones clave
 
-- Cliente API centralizado en `src/services/api/client.js` para unificar:
-  - `baseURL` por entorno
-  - timeout y retry controlado
-  - manejo estandar de errores (`ApiError`)
-  - recuperacion de `401` (refresh/relogin paciente) y limpieza de sesion
-- Persistencia de auth en cliente con helper unico (`features/auth/sessionManager.js`), evitando duplicar la gestion de token en varios módulos.
+- Cliente API centralizado en `src/services/api/client.js` para unificar `baseURL`, timeout, retry y errores.
+- Persistencia de auth en cliente con `features/auth/sessionManager.js`.
 - Guardas de ruta separadas:
-  - `ProtectedRoute`: exige sesion autenticada
-  - `RoleRoute`: valida roles permitidos y deriva a `/no-autorizado`
-- Rutas con lazy loading (`src/app/routes.jsx`) para reducir payload inicial sin cambiar paths existentes.
+  - `ProtectedRoute`
+  - `RoleRoute`
+- Rutas con lazy loading (`src/app/routes.jsx`).
+- La reserva del paciente usa un flujo de pago simple:
+  - crea reserva en `hold`
+  - pide preferencia al backend
+  - renderiza `Wallet` de Mercado Pago
+  - al volver, consulta el estado local del turno/pago
+  - deja el webhook como fuente principal de verdad
 
+## Mercado Pago en desarrollo
+
+- Frontend local: `http://localhost:5173`
+- Backend local: `http://localhost:4000`
+- Si pruebas webhook real, el backend debe estar expuesto por `ngrok`.
+- El frontend no necesita URL publica para operar normalmente, pero el backend si la necesita para que Mercado Pago pueda notificar el webhook.

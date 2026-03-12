@@ -1,19 +1,13 @@
 # San Rafael Turnos
 
-Sistema web de turnos online para la Clinica San Rafael Arcangel con pagos mock, confirmacion por WhatsApp mock y paneles por rol.
+Sistema web de turnos online para la Clinica San Rafael Arcangel con pagos via Mercado Pago Checkout Pro, confirmacion por WhatsApp mock y paneles por rol.
 
-## Estados
+## Estado actual
 
-- Version: `0.1.0` (MVP)
-- Fecha: `2026-02-24`
-- Estructura: `frontend/` y `backend/` independientes
-
-## Modo de trabajo
-
-El repositorio ahora esta configurado como dos proyectos independientes:
-
-- `backend/`: tiene su propio `package.json`, `package-lock.json` y `node_modules`.
-- `frontend/`: tiene su propio `package.json`, `package-lock.json` y `node_modules`.
+- Version: `0.1.0`
+- Monorepo con `backend/` y `frontend/` independientes
+- Backend en Express + Sequelize/PostgreSQL
+- Frontend en React + Vite
 
 ## Arquitectura
 
@@ -25,7 +19,9 @@ El repositorio ahora esta configurado como dos proyectos independientes:
 |   |   |-- controllers/
 |   |   |-- db/
 |   |   |-- docs/
+|   |   |-- jobs/
 |   |   |-- middlewares/
+|   |   |-- repositories/
 |   |   |-- routes/
 |   |   |-- services/
 |   |   `-- utils/
@@ -37,6 +33,7 @@ El repositorio ahora esta configurado como dos proyectos independientes:
         |-- components/
         |-- features/
         |-- pages/
+        |-- services/
         `-- styles/
 ```
 
@@ -49,10 +46,10 @@ El repositorio ahora esta configurado como dos proyectos independientes:
 ## Setup local
 
 1. Configura variables:
-- Backend: `backend/.env`
-- Frontend: `frontend/.env`
+   - Backend: `backend/.env`
+   - Frontend: `frontend/.env`
 
-2. Instala dependencias por proyecto:
+2. Instala dependencias:
 
 ```bash
 cd backend
@@ -61,31 +58,49 @@ cd ../frontend
 npm install
 ```
 
-3. Ejecuta migracion y seed (desde `backend/`):
+3. Ejecuta migracion y seed desde `backend/`:
 
 ```bash
 npm run db:migrate
 npm run seed
 ```
 
-4. Levanta backend (terminal 1, en `backend/`):
+4. Levanta backend:
 
 ```bash
+cd backend
 npm run dev
 ```
 
-5. Levanta frontend (terminal 2, en `frontend/`):
+5. Levanta frontend:
 
 ```bash
+cd frontend
 npm run dev
 ```
+
+6. Si vas a probar Mercado Pago end-to-end en desarrollo, expone el backend con `ngrok`:
+
+```bash
+ngrok http 4000
+```
+
+7. Copia la URL publica de `ngrok` en:
+
+```env
+MERCADOPAGO_WEBHOOK_URL=https://TU-URL-NGROK/api/payments/mercadopago/webhook
+```
+
+Y reinicia el backend.
 
 ## Endpoints utiles
 
 - Frontend: `http://localhost:5173`
-- Health backend: `http://localhost:4000/health`
+- Health backend local: `http://localhost:4000/health`
+- Health backend publico: `https://TU-URL-NGROK/health`
 - OpenAPI JSON: `http://localhost:4000/api/openapi.json`
 - Swagger: `http://localhost:4000/api/docs`
+- ngrok inspector: `http://127.0.0.1:4040`
 
 ## Credenciales demo
 
@@ -94,13 +109,29 @@ npm run dev
 - Medico: `medico@mail.com / medico`
 - Paciente: OTP desde pantalla de login (en desarrollo se informa `debugCode`)
 
+## Flujo Mercado Pago en desarrollo
+
+1. El paciente crea una reserva. El turno nace en `hold` y el pago en `pending`.
+2. El backend crea la preferencia usando el monto persistido del turno.
+3. El frontend renderiza el `Wallet` oficial de `@mercadopago/sdk-react`.
+4. Mercado Pago devuelve al frontend y, en paralelo, notifica al backend por webhook.
+5. El backend consulta el pago real en Mercado Pago, reconcilia el estado local y confirma el turno si el pago fue aprobado.
+6. El frontend consulta el estado local y muestra `verificando`, `pagado`, `pendiente`, `rechazado` o `reserva vencida`.
+
+## Verificacion manual recomendada
+
+- Abrir `https://TU-URL-NGROK/health` y comprobar `"ok": true`.
+- Crear una reserva nueva desde `http://localhost:5173`.
+- Iniciar y completar el pago en Mercado Pago.
+- Confirmar en `ngrok` un `POST /api/payments/mercadopago/webhook 200 OK`.
+- Verificar que el turno quede `Confirmado` y el pago `Pagado` en la app.
+
 ## Scripts
 
-### Backend (`backend/`)
+### Backend
 
 - `npm run dev`
 - `npm run start`
-- `npm run migrate`
 - `npm run db:migrate`
 - `npm run db:rollback`
 - `npm run seed`
@@ -108,7 +139,7 @@ npm run dev
 - `npm run test`
 - `npm run audit:db-schema`
 
-### Frontend (`frontend/`)
+### Frontend
 
 - `npm run dev`
 - `npm run build`
@@ -116,16 +147,18 @@ npm run dev
 - `npm run lint`
 - `npm run test`
 
-## Seguridad MVP
+## Seguridad
 
-- JWT access token 15m.
+- JWT access token de 15m.
 - Refresh token con rotacion y revocacion.
 - OTP hasheado.
 - Rate limit global y para rutas sensibles.
 - Validacion de input con Zod.
 - Guardrails anti doble booking por transaccion + indice unico parcial.
+- Webhook de Mercado Pago con validacion opcional de firma `x-signature`.
 
-## Limites actuales (MVP)
+## Limites actuales
 
-- WhatsApp real no integrado (mock).
-- Pasarela real no integrada (mock).
+- WhatsApp real no integrado, solo mock.
+- Produccion aun no configurada.
+- En desarrollo, el webhook requiere `ngrok` o una URL publica equivalente.

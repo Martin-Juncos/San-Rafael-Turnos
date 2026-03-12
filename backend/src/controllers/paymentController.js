@@ -70,6 +70,7 @@ const isLocalFrontendOrigin = (origin) => {
 
 const buildMercadoPagoPreferenceRedirectConfig = (appointmentId, requestedOrigin = '') => {
   const baseUrl = String(requestedOrigin || config.FRONTEND_PUBLIC_URL || 'http://localhost:5173').replace(/\/+$/, '')
+  // En localhost evitamos back_urls porque Mercado Pago no completa bien el retorno con URLs no publicas.
   if (!baseUrl || isLocalFrontendOrigin(baseUrl)) {
     return {}
   }
@@ -295,6 +296,7 @@ export const receiveMercadoPagoWebhook = async (req, res) => {
 
   ok(res, { received: true }, 'mercadopago_webhook_received')
 
+  // Respondemos primero y reconciliamos en background para evitar retries innecesarios del provider.
   if (!notification.providerPaymentId || (notification.webhookTopic && notification.webhookTopic !== 'payment')) {
     logger.info(
       {

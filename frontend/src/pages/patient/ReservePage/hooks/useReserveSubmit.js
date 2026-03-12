@@ -414,6 +414,7 @@ export function useReserveSubmit ({
         return
       }
 
+      // Reutilizamos solo preferencias pendientes; un rechazo debe generar una preferencia nueva.
       const shouldReuseExistingPreference = latestPayment.status === 'pending' && latestPayment.preferenceId
       if (shouldReuseExistingPreference) {
         setMercadoPagoPreferenceId(latestPayment.preferenceId)
