@@ -93,6 +93,32 @@ MERCADOPAGO_WEBHOOK_URL=https://TU-URL-NGROK/api/payments/mercadopago/webhook
 
 Y reinicia el backend.
 
+## Arranque diario
+
+Si vas a trabajar en desarrollo general:
+
+```bash
+cd backend
+npm run dev
+```
+
+```bash
+cd frontend
+npm run dev
+```
+
+Si ademas vas a probar Mercado Pago con webhook real:
+
+```bash
+C:\ngrok\ngrok.exe http 4000
+```
+
+Checklist rapida de inicio:
+- Backend: `http://localhost:4000/health`
+- Frontend: `http://localhost:5173`
+- ngrok: confirmar que muestra una URL publica activa
+- Si la URL de `ngrok` cambia, actualizar `MERCADOPAGO_WEBHOOK_URL` en `backend/.env` o `backend/.env.local` y reiniciar backend
+
 ## Endpoints utiles
 
 - Frontend: `http://localhost:5173`

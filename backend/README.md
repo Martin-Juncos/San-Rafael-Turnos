@@ -27,6 +27,25 @@ npm run dev
 Healthcheck:
 - `GET http://localhost:4000/health`
 
+## Arranque diario
+
+Para empezar a trabajar:
+
+```bash
+npm run dev
+```
+
+Si tambien vas a probar pagos reales en desarrollo, en otra terminal:
+
+```bash
+C:\ngrok\ngrok.exe http 4000
+```
+
+Antes de probar Mercado Pago:
+- verifica `http://localhost:4000/health`
+- verifica que `ngrok` siga apuntando a `http://localhost:4000`
+- si la URL publica cambio, actualiza `MERCADOPAGO_WEBHOOK_URL` y reinicia backend
+
 ## Mercado Pago en desarrollo
 
 Variables clave:
@@ -112,7 +131,7 @@ Los logs relevantes del backend usan estos eventos:
 - `mercadopago-webhook-processed`
 - `mercadopago-payment-sync-request-processed`
 
-Esto permite diagnosticar rapido si falló:
+Esto permite diagnosticar rapido si fallo:
 - la creacion de preferencia,
 - la llegada del webhook,
 - la validacion de firma,
