@@ -153,6 +153,7 @@ export function useReservePageState () {
     handleMercadoPagoWalletError: submit.handleMercadoPagoWalletError,
     handleMercadoPagoWalletSubmit: submit.handleMercadoPagoWalletSubmit,
     currentReservation: submit.currentReservation,
+    paymentUiState: submit.paymentUiState,
     appointmentsForList: submit.appointmentsForList,
     formatDateLabel,
     formatDateLongLabel,

@@ -11,6 +11,46 @@ import {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+const resolvePaymentUiState = ({ holdResult, mercadoPagoReturnPending, checkingMercadoPago }) => {
+  if (!holdResult?.appointment || !holdResult?.payment) {
+    return null
+  }
+
+  if (holdResult.payment.status === 'paid') {
+    return {
+      tone: 'success',
+      title: 'Pago confirmado',
+      description: 'Mercado Pago aprobo el cobro y tu turno ya quedo confirmado.'
+    }
+  }
+
+  if (holdResult.payment.status === 'failed') {
+    return {
+      tone: 'danger',
+      title: 'Pago rechazado',
+      description: 'El cobro no se pudo acreditar. Puedes intentar nuevamente con Mercado Pago.'
+    }
+  }
+
+  if (mercadoPagoReturnPending || checkingMercadoPago) {
+    return {
+      tone: 'info',
+      title: 'Verificando pago',
+      description: 'Ya volviste de Mercado Pago. Estamos consultando el estado real del pago en el servidor.'
+    }
+  }
+
+  if (holdResult.payment.status === 'pending') {
+    return {
+      tone: 'warning',
+      title: 'Pago pendiente',
+      description: 'Tu reserva existe, pero el turno se confirmara cuando el backend reciba y valide el pago.'
+    }
+  }
+
+  return null
+}
+
 export function useReserveSubmit ({
   auth,
   locationSearch,
@@ -397,6 +437,14 @@ export function useReserveSubmit ({
     return patientAppointments.filter((item) => item.id !== holdResult?.appointment?.id)
   }, [patientAppointments, holdResult?.appointment?.id])
 
+  const paymentUiState = useMemo(() => {
+    return resolvePaymentUiState({
+      holdResult,
+      mercadoPagoReturnPending,
+      checkingMercadoPago
+    })
+  }, [checkingMercadoPago, holdResult, mercadoPagoReturnPending])
+
   return {
     holdResult,
     patientAppointments,
@@ -411,6 +459,7 @@ export function useReserveSubmit ({
     handleMercadoPagoWalletSubmit,
     handleMercadoPagoWalletError,
     currentReservation,
+    paymentUiState,
     appointmentsForList,
     loadPatientAppointments
   }

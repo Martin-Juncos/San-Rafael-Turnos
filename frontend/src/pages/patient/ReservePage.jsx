@@ -84,6 +84,7 @@ export function ReservePage () {
             mercadoPagoPreferenceId={reserve.mercadoPagoPreferenceId}
             checkingMercadoPago={reserve.checkingMercadoPago}
             mercadoPagoReturnPending={reserve.mercadoPagoReturnPending}
+            paymentUiState={reserve.paymentUiState}
             authToken={reserve.auth.token}
             onCreateHold={reserve.createHold}
             onStartMercadoPagoCheckout={reserve.startMercadoPagoCheckout}

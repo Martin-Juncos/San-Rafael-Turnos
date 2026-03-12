@@ -11,21 +11,39 @@ export function ReserveSummary ({
   formatDateLongLabel,
   formatMoney
 }) {
+  const paymentToneClass = currentReservation?.paymentStatus === 'Pagado'
+    ? 'bg-emerald-100 text-emerald-900'
+    : currentReservation?.paymentStatus === 'Pendiente'
+      ? 'bg-amber-100 text-amber-900'
+      : currentReservation?.paymentStatus === 'Fallido'
+        ? 'bg-red-100 text-red-900'
+        : 'bg-slate-100 text-slate-800'
+
   return (
     <div ref={summaryRef}>
-      <Card className='space-y-2'>
+      <Card className='space-y-4'>
         <h2 className='text-lg font-semibold text-emerald-950'>Resumen de reserva</h2>
         {currentReservation
           ? (
-            <div className='space-y-1 text-sm text-emerald-900/80'>
-              <p><span className='font-semibold'>Medico:</span> {currentReservation.doctorName}</p>
-              <p><span className='font-semibold'>Especialidad:</span> {currentReservation.specialtyName}</p>
-              <p><span className='font-semibold'>Dia:</span> {formatDateLongLabel(currentReservation.date)}</p>
-              <p><span className='font-semibold'>Horario:</span> {currentReservation.startTime || '-'}</p>
-              <p><span className='font-semibold'>Cobertura:</span> {currentReservation.insuranceName}</p>
-              <p><span className='font-semibold'>Estado del turno:</span> {currentReservation.appointmentStatus}</p>
-              <p><span className='font-semibold'>Estado del pago:</span> {currentReservation.paymentStatus}</p>
-              <p><span className='font-semibold'>Monto pagado:</span> {formatMoney(currentReservation.paidAmount)}</p>
+            <div className='space-y-3'>
+              <div className='flex flex-wrap items-center gap-2'>
+                <span className='text-sm font-semibold text-emerald-950'>Estado actual</span>
+                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${paymentToneClass}`}>
+                  {currentReservation.paymentStatus}
+                </span>
+                <span className='rounded-full bg-white/80 px-2.5 py-1 text-xs font-medium text-emerald-900'>
+                  Turno: {currentReservation.appointmentStatus}
+                </span>
+              </div>
+
+              <div className='grid gap-2 rounded-2xl border border-emerald-200/70 bg-white/70 p-4 text-sm text-emerald-900/80'>
+                <p><span className='font-semibold'>Medico:</span> {currentReservation.doctorName}</p>
+                <p><span className='font-semibold'>Especialidad:</span> {currentReservation.specialtyName}</p>
+                <p><span className='font-semibold'>Dia:</span> {formatDateLongLabel(currentReservation.date)}</p>
+                <p><span className='font-semibold'>Horario:</span> {currentReservation.startTime || '-'}</p>
+                <p><span className='font-semibold'>Cobertura:</span> {currentReservation.insuranceName}</p>
+                <p><span className='font-semibold'>Monto:</span> {formatMoney(currentReservation.paidAmount)}</p>
+              </div>
             </div>
             )
           : <p className='text-sm text-emerald-900/70'>Aun no creaste una reserva.</p>}
