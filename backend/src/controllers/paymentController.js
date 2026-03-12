@@ -222,7 +222,11 @@ export const createMercadoPagoPreferenceForAppointment = async (req, res) => {
       actorId: req.auth.sub,
       appointmentId: appointment.id,
       localPaymentId: appointment.payment.id,
-      preferenceId: preference.id
+      preferenceId: preference.id,
+      paymentAmount: Number(appointment.payment.amount),
+      paymentCurrency: appointment.payment.currency,
+      notificationUrlConfigured: Boolean(notificationUrl),
+      redirectMode: notificationUrl ? 'webhook_and_back_urls' : 'back_urls_only'
     },
     'mercadopago-preference-created'
   )
@@ -276,6 +280,19 @@ export const receiveMercadoPagoWebhook = async (req, res) => {
   const notification = extractMercadoPagoWebhookNotification(req)
   const signatureValidation = validateMercadoPagoWebhookSignature(req)
 
+  logger.info(
+    {
+      requestId: req.requestId,
+      webhookTopic: notification.webhookTopic || null,
+      webhookAction: notification.webhookAction || null,
+      webhookEventId: notification.webhookEventId || null,
+      providerPaymentId: notification.providerPaymentId || null,
+      signatureValidationEnabled: signatureValidation.enabled,
+      signatureValidationReason: signatureValidation.reason || null
+    },
+    'mercadopago-webhook-received'
+  )
+
   ok(res, { received: true }, 'mercadopago_webhook_received')
 
   if (!notification.providerPaymentId || (notification.webhookTopic && notification.webhookTopic !== 'payment')) {
@@ -307,7 +324,8 @@ export const receiveMercadoPagoWebhook = async (req, res) => {
           webhookTopic: notification.webhookTopic,
           matched: result.matched,
           appointmentId: result.appointmentId || null,
-          paymentStatus: result.paymentStatus || null
+          paymentStatus: result.paymentStatus || null,
+          providerStatus: result.providerStatus || null
         },
         'mercadopago-webhook-processed'
       )
@@ -349,6 +367,21 @@ export const syncMercadoPagoPayment = async (req, res) => {
     actorRole: req.auth.role,
     actorId: req.auth.sub
   })
+
+  logger.info(
+    {
+      requestId: req.requestId,
+      actorRole: req.auth.role,
+      actorId: req.auth.sub,
+      appointmentId: refreshedAppointment.id,
+      localPaymentId: refreshedAppointment.payment?.id || null,
+      providerPaymentId,
+      providerStatus: refreshedAppointment.payment?.providerStatus || null,
+      paymentStatus: refreshedAppointment.payment?.status || null,
+      appointmentStatus: refreshedAppointment.status
+    },
+    'mercadopago-payment-sync-request-processed'
+  )
 
   ok(
     res,

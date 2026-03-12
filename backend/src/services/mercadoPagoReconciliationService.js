@@ -214,6 +214,7 @@ export const syncMercadoPagoPaymentLocally = async ({
   const providerStatus = String(mpPayment.status || '')
   const preferenceId = String(mpPayment.preference_id || '')
   const externalReference = String(mpPayment.external_reference || '')
+  const source = webhookNotification ? 'webhook' : 'manual'
 
   let becamePaid = false
   let webhookRecorded = true
@@ -294,7 +295,7 @@ export const syncMercadoPagoPaymentLocally = async ({
           providerPaymentId,
           providerStatus,
           nextStatus,
-          source: webhookNotification ? 'webhook' : 'manual'
+          source
         },
         transaction
       })
@@ -308,6 +309,20 @@ export const syncMercadoPagoPaymentLocally = async ({
   if (becamePaid) {
     queueAppointmentConfirmationMessage(refreshed)
   }
+
+  logger.info(
+    {
+      source,
+      appointmentId: refreshed.id,
+      localPaymentId: refreshed.payment?.id || null,
+      providerPaymentId,
+      providerStatus,
+      localStatus: refreshed.payment?.status || null,
+      appointmentStatus: refreshed.status,
+      webhookRecorded
+    },
+    'mercadopago-payment-reconciled'
+  )
 
   return refreshed
 }
@@ -333,6 +348,18 @@ export const processMercadoPagoWebhookPayment = async ({
 
   assertMercadoPagoPaymentMatchesAppointment({ appointment, mpPayment })
 
+  logger.info(
+    {
+      providerPaymentId: String(mpPayment?.id || ''),
+      externalReference: String(mpPayment?.external_reference || ''),
+      preferenceId: String(mpPayment?.preference_id || ''),
+      providerStatus: String(mpPayment?.status || ''),
+      appointmentId: appointment.id,
+      localPaymentId: appointment.payment.id
+    },
+    'mercadopago-webhook-payment-matched'
+  )
+
   const refreshedAppointment = await syncMercadoPagoPaymentLocally({
     appointmentId: appointment.id,
     mpPayment,
@@ -345,6 +372,7 @@ export const processMercadoPagoWebhookPayment = async ({
     matched: true,
     appointmentId: refreshedAppointment.id,
     paymentId: refreshedAppointment.payment?.id || null,
-    paymentStatus: refreshedAppointment.payment?.status || null
+    paymentStatus: refreshedAppointment.payment?.status || null,
+    providerStatus: refreshedAppointment.payment?.providerStatus || null
   }
 }

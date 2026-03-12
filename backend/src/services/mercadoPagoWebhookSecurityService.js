@@ -91,6 +91,7 @@ export const validateMercadoPagoWebhookSignature = (req, options = {}) => {
     valid: true,
     dataId,
     requestId,
-    timestamp
+    timestamp,
+    reason: 'validated'
   }
 }
