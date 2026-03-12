@@ -18,6 +18,7 @@ import {
   processMercadoPagoWebhookPayment,
   syncMercadoPagoPaymentLocally
 } from '../services/mercadoPagoReconciliationService.js'
+import { validateMercadoPagoWebhookSignature } from '../services/mercadoPagoWebhookSecurityService.js'
 
 const appointmentWithPaymentInclude = [
   { model: Payment, as: 'payment' },
@@ -273,9 +274,20 @@ const extractMercadoPagoWebhookNotification = (req) => {
 
 export const receiveMercadoPagoWebhook = async (req, res) => {
   const notification = extractMercadoPagoWebhookNotification(req)
+  const signatureValidation = validateMercadoPagoWebhookSignature(req)
+
   ok(res, { received: true }, 'mercadopago_webhook_received')
 
   if (!notification.providerPaymentId || (notification.webhookTopic && notification.webhookTopic !== 'payment')) {
+    logger.info(
+      {
+        requestId: req.requestId,
+        webhookTopic: notification.webhookTopic || null,
+        providerPaymentId: notification.providerPaymentId || null,
+        signatureValidationEnabled: signatureValidation.enabled
+      },
+      'mercadopago-webhook-ignored'
+    )
     return
   }
 

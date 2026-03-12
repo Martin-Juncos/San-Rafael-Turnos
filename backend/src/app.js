@@ -21,7 +21,12 @@ app.use(
     credentials: true
   })
 )
-app.use(express.json({ limit: '1mb' }))
+app.use(express.json({
+  limit: '1mb',
+  verify: (req, _res, buffer) => {
+    req.rawBody = buffer.toString('utf8')
+  }
+}))
 app.use(globalLimiter)
 app.use(requestLogMiddleware)
 
