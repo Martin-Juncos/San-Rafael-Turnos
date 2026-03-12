@@ -138,6 +138,7 @@ const recoverUnauthorizedRequest = async (error) => {
           fullName: stored.patient.fullName,
           dni: stored.patient.dni,
           phone: stored.patient.phone,
+          email: stored.patient.email || undefined,
           streetAndNumber: stored.patient.streetAndNumber || undefined,
           city: stored.patient.city || undefined
         })
@@ -237,4 +238,3 @@ export const unwrapCollection = (response) => {
   const pagination = payload?.pagination || data?.pagination || null
   return { items, pagination }
 }
-

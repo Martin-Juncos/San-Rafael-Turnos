@@ -6,6 +6,7 @@ export function ReserveActions ({
   isPatientRole,
   holdResult,
   mercadoPagoLoading,
+  mercadoPagoPreferenceId,
   checkingMercadoPago,
   authToken,
   onCreateHold,
@@ -13,26 +14,33 @@ export function ReserveActions ({
 }) {
   return (
     <>
-      <div className='grid gap-2 sm:grid-cols-2'>
+      <div className={`grid gap-2 ${isPatientRole ? 'sm:grid-cols-2' : ''}`}>
         <Button onClick={onCreateHold} disabled={!startTime}>Reservar turno (pendiente de pago)</Button>
-        <Button
-          variant='secondary'
-          onClick={onStartMercadoPagoCheckout}
-          disabled={
-            !isPatientRole ||
-            !holdResult?.appointment?.id ||
-            mercadoPagoLoading ||
-            holdResult?.payment?.status === 'paid'
-          }
-        >
-          {mercadoPagoLoading ? 'Redirigiendo...' : 'Pagar con Mercado Pago (sandbox)'}
-        </Button>
+        {isPatientRole
+          ? (
+            <Button
+              variant='secondary'
+              onClick={onStartMercadoPagoCheckout}
+              disabled={
+                !holdResult?.appointment?.id ||
+                mercadoPagoLoading ||
+                holdResult?.payment?.status === 'paid'
+              }
+            >
+              {mercadoPagoLoading
+                ? 'Cargando Mercado Pago...'
+                : mercadoPagoPreferenceId
+                  ? 'Recargar boton de pago'
+                  : 'Pagar con Mercado Pago'}
+            </Button>
+            )
+          : null}
       </div>
 
       {holdResult?.appointment?.id && holdResult?.payment?.status === 'pending'
         ? (
           <p className='text-xs text-emerald-900/75'>
-            El turno queda confirmado solo cuando Mercado Pago envie un webhook valido y el backend verifique el pago.
+            El turno queda confirmado cuando Mercado Pago devuelve el pago y el backend sincroniza el estado.
             {checkingMercadoPago ? ' Verificando estado...' : ''}
           </p>
           )

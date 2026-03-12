@@ -416,11 +416,22 @@ export function PatientDashboardPage () {
                   <Button variant='danger' className='px-3 py-1.5 text-xs' onClick={() => cancel(appointment.id)}>
                     Cancelar
                   </Button>
-                  {appointment.payment?.status === 'pending' ? (
-                    <Button className='px-3 py-1.5 text-xs' onClick={() => confirmPendingPayment(appointment.id)}>
-                      Pagar (mock)
-                    </Button>
-                  ) : null}
+                  {appointment.payment?.status === 'pending' && appointment.payment?.provider === 'mercadopago'
+                    ? (
+                      <Link to={`/reservar?appointmentId=${appointment.id}`} className='inline-flex'>
+                        <Button className='px-3 py-1.5 text-xs'>
+                          Continuar pago
+                        </Button>
+                      </Link>
+                      )
+                    : null}
+                  {appointment.payment?.status === 'pending' && appointment.payment?.provider !== 'mercadopago'
+                    ? (
+                      <Button className='px-3 py-1.5 text-xs' onClick={() => confirmPendingPayment(appointment.id)}>
+                        Pagar (mock)
+                      </Button>
+                      )
+                    : null}
                 </div>
               </div>
             ))}

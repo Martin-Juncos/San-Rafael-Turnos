@@ -9,6 +9,8 @@ import {
   paymentStatusLabels
 } from '../reserveUtils'
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 export function useReserveSubmit ({
   auth,
   locationSearch,
@@ -27,6 +29,7 @@ export function useReserveSubmit ({
   const [patientAppointments, setPatientAppointments] = useState([])
   const [checkingMercadoPago, setCheckingMercadoPago] = useState(false)
   const [mercadoPagoLoading, setMercadoPagoLoading] = useState(false)
+  const [mercadoPagoPreferenceId, setMercadoPagoPreferenceId] = useState('')
   const summaryRef = useRef(null)
   const webhookPaidNotifiedRef = useRef(false)
 
@@ -44,6 +47,15 @@ export function useReserveSubmit ({
     }
   }, [auth.role, setError])
 
+  const loadAppointmentReservation = useCallback(async (appointmentId) => {
+    const [appointment, payment] = await Promise.all([
+      appointmentsService.getById(appointmentId),
+      paymentsService.getByAppointment(appointmentId)
+    ])
+
+    return { appointment, payment }
+  }, [])
+
   useEffect(() => {
     loadPatientAppointments().catch(() => {})
   }, [loadPatientAppointments])
@@ -55,8 +67,10 @@ export function useReserveSubmit ({
     const appointmentId = params.get('appointmentId')
     const mpStatus = params.get('mp_status')
     const paymentId = params.get('payment_id') || params.get('collection_id')
+    const providerStatus = params.get('status') || params.get('collection_status')
 
-    if (!appointmentId && !mpStatus && !paymentId) return
+    if (!appointmentId && !mpStatus && !paymentId && !providerStatus) return
+    const cameFromMercadoPago = Boolean(mpStatus || paymentId || providerStatus)
 
     let isCancelled = false
 
@@ -72,15 +86,22 @@ export function useReserveSubmit ({
 
       try {
         if (!appointmentId) {
-          clearQuery()
+          if (cameFromMercadoPago) {
+            clearQuery()
+          }
           return
         }
 
-        const [appointment, payment] = await Promise.all([
-          appointmentsService.getById(appointmentId),
-          paymentsService.getByAppointment(appointmentId)
-        ])
+        let syncError = null
+        if (paymentId) {
+          try {
+            await paymentsService.syncMercadoPago(appointmentId, paymentId)
+          } catch (apiError) {
+            syncError = apiError
+          }
+        }
 
+        const { appointment, payment } = await loadAppointmentReservation(appointmentId)
         if (isCancelled) return
         setHoldResult((prev) => ({
           appointment,
@@ -88,24 +109,35 @@ export function useReserveSubmit ({
           paymentIntent: prev?.paymentIntent ?? null,
           pricing: prev?.pricing ?? null
         }))
+        setMercadoPagoPreferenceId(payment.status === 'pending' ? (payment.preferenceId || '') : '')
         await loadPatientAppointments()
 
-        if (payment.status === 'paid') {
-          setSuccess('Pago aprobado y validado. Tu turno quedo confirmado.')
-        } else if (mpStatus === 'success' || paymentId) {
-          setSuccess('Recibimos tu regreso de Mercado Pago. Estamos validando el pago con webhook seguro.')
-        } else if (mpStatus === 'failure') {
-          setError('El pago en Mercado Pago fue rechazado o cancelado.')
-        } else if (mpStatus === 'pending') {
-          setSuccess('Pago pendiente de acreditacion. Te avisaremos cuando se confirme.')
+        if (cameFromMercadoPago) {
+          if (payment.status === 'paid') {
+            setSuccess('Pago aprobado y validado. Tu turno quedo confirmado.')
+          } else if (syncError) {
+            setPaymentError(syncError.message || 'No se pudo validar el pago devuelto por Mercado Pago.')
+          } else if (mpStatus === 'success' || paymentId) {
+            setSuccess('Recibimos tu regreso de Mercado Pago. Estamos validando el pago.')
+          } else if (mpStatus === 'failure') {
+            setError('El pago en Mercado Pago fue rechazado o cancelado.')
+          } else if (mpStatus === 'pending' || providerStatus === 'pending' || providerStatus === 'in_process') {
+            setSuccess('Pago pendiente de acreditacion. Te avisaremos cuando se confirme.')
+          } else if (providerStatus === 'rejected' || providerStatus === 'cancelled') {
+            setError('El pago en Mercado Pago fue rechazado o cancelado.')
+          }
         }
 
-        clearQuery()
+        if (cameFromMercadoPago) {
+          clearQuery()
+        }
         summaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       } catch (apiError) {
         if (!isCancelled) {
-          setError(apiError.message || 'No se pudo consultar el estado del pago de Mercado Pago.')
-          clearQuery()
+          setPaymentError(apiError.message || 'No se pudo validar el pago devuelto por Mercado Pago.')
+          if (cameFromMercadoPago) {
+            clearQuery()
+          }
         }
       }
     }
@@ -115,7 +147,7 @@ export function useReserveSubmit ({
     return () => {
       isCancelled = true
     }
-  }, [auth.role, locationSearch, loadPatientAppointments, setError, setPaymentError, setSuccess])
+  }, [auth.role, locationSearch, loadAppointmentReservation, loadPatientAppointments, setError, setPaymentError, setSuccess])
 
   useEffect(() => {
     if (auth.role !== 'patient') return
@@ -127,23 +159,20 @@ export function useReserveSubmit ({
     const refreshPaymentStatus = async () => {
       setCheckingMercadoPago(true)
       try {
-        const [appointment, payment] = await Promise.all([
-          appointmentsService.getById(holdResult.appointment.id),
-          paymentsService.getByAppointment(holdResult.appointment.id)
-        ])
+        const { appointment, payment } = await loadAppointmentReservation(holdResult.appointment.id)
         if (isCancelled) return
 
-        setHoldResult((prev) => {
-          if (!prev) return prev
-          return {
-            ...prev,
-            appointment,
-            payment
-          }
-        })
+        setHoldResult((prev) => ({
+          appointment,
+          payment,
+          paymentIntent: prev?.paymentIntent ?? null,
+          pricing: prev?.pricing ?? null
+        }))
+        setMercadoPagoPreferenceId(payment.status === 'pending' ? (payment.preferenceId || '') : '')
 
         if (payment.status === 'paid' && !webhookPaidNotifiedRef.current) {
           webhookPaidNotifiedRef.current = true
+          setMercadoPagoPreferenceId('')
           setSuccess('Pago aprobado y validado por Mercado Pago. Tu turno quedo confirmado.')
           await loadPatientAppointments()
         }
@@ -165,7 +194,7 @@ export function useReserveSubmit ({
       isCancelled = true
       window.clearInterval(intervalId)
     }
-  }, [auth.role, holdResult?.appointment?.id, holdResult?.payment?.status, loadPatientAppointments, setSuccess])
+  }, [auth.role, holdResult?.appointment?.id, holdResult?.payment?.status, loadAppointmentReservation, loadPatientAppointments, setSuccess])
 
   const createHold = async () => {
     setError('')
@@ -199,6 +228,14 @@ export function useReserveSubmit ({
       setError('Completa un telefono valido del paciente.')
       return
     }
+    if (!form.email.trim()) {
+      setError('Completa un email del paciente para continuar.')
+      return
+    }
+    if (form.email.trim() && !EMAIL_REGEX.test(form.email.trim())) {
+      setError('Completa un email valido del paciente.')
+      return
+    }
     if (isStaffBooking && !patientExists && (!form.streetAndNumber.trim() || form.streetAndNumber.trim().length < 3)) {
       setError('Completa calle y numero del paciente para continuar.')
       return
@@ -214,6 +251,7 @@ export function useReserveSubmit ({
         fullName: form.fullName.trim(),
         dni: normalizedDni,
         phone: form.phone.trim(),
+        email: form.email.trim() || undefined,
         streetAndNumber: form.streetAndNumber.trim() || undefined,
         city: form.city.trim() || undefined,
         symptoms: form.symptoms.trim() || undefined,
@@ -221,6 +259,7 @@ export function useReserveSubmit ({
       }
       const data = await appointmentsService.create(payload)
       setHoldResult(data)
+      setMercadoPagoPreferenceId('')
       await loadPatientAppointments()
       webhookPaidNotifiedRef.current = false
       setPaymentError('')
@@ -239,20 +278,61 @@ export function useReserveSubmit ({
     setError('')
     setPaymentError('')
     webhookPaidNotifiedRef.current = false
+
+    const existingPreferenceId = holdResult?.payment?.preferenceId || mercadoPagoPreferenceId
+    if (existingPreferenceId) {
+      setMercadoPagoPreferenceId(existingPreferenceId)
+      return
+    }
+
+    if (!form.email.trim()) {
+      setPaymentError('Completa un email del paciente antes de continuar con Mercado Pago.')
+      return
+    }
+    if (!EMAIL_REGEX.test(form.email.trim())) {
+      setPaymentError('Completa un email valido del paciente antes de continuar con Mercado Pago.')
+      return
+    }
+
     setMercadoPagoLoading(true)
     try {
       const preference = await paymentsService.createMercadoPagoPreference(holdResult.appointment.id)
-      const checkoutUrl = preference.sandboxInitPoint || preference.initPoint
-      if (!checkoutUrl) {
-        throw new Error('No se recibio URL de checkout')
+      const preferenceId = String(preference.preferenceId || preference.id || '')
+
+      if (!preferenceId) {
+        throw new Error('No se recibio preferenceId')
       }
-      window.location.assign(checkoutUrl)
+
+      setMercadoPagoPreferenceId(preferenceId)
+      setHoldResult((prev) => {
+        if (!prev?.payment) return prev
+        return {
+          ...prev,
+          payment: {
+            ...prev.payment,
+            provider: 'mercadopago',
+            status: 'pending',
+            preferenceId
+          }
+        }
+      })
     } catch (apiError) {
       setError(apiError.message || 'No se pudo iniciar Mercado Pago.')
     } finally {
       setMercadoPagoLoading(false)
     }
   }
+
+  const handleMercadoPagoWalletReady = useCallback(() => undefined, [])
+
+  const handleMercadoPagoWalletSubmit = useCallback(() => undefined, [])
+
+  const handleMercadoPagoWalletError = useCallback((error) => {
+    const message = typeof error?.message === 'string' && error.message
+      ? error.message
+      : 'No se pudo cargar el boton de Mercado Pago.'
+    setPaymentError(message)
+  }, [setPaymentError])
 
   const currentReservation = useMemo(() => {
     if (!holdResult?.appointment) return null
@@ -299,9 +379,13 @@ export function useReserveSubmit ({
     patientAppointments,
     checkingMercadoPago,
     mercadoPagoLoading,
+    mercadoPagoPreferenceId,
     summaryRef,
     createHold,
     startMercadoPagoCheckout,
+    handleMercadoPagoWalletReady,
+    handleMercadoPagoWalletSubmit,
+    handleMercadoPagoWalletError,
     currentReservation,
     appointmentsForList,
     loadPatientAppointments

@@ -9,6 +9,7 @@ import { ok, paginated } from '../utils/response.js'
 import { addMinutesToTime } from '../utils/time.js'
 import {
   dniSchema,
+  emailSchema,
   phoneSchema,
   isoDateSchema,
   hhmmSchema,
@@ -39,6 +40,7 @@ const createAppointmentBodySchema = z.object({
   fullName: z.string().min(3).max(120),
   dni: dniSchema,
   phone: phoneSchema,
+  email: emailSchema.optional(),
   streetAndNumber: z.string().min(3).max(160).optional(),
   city: z.string().min(2).max(120).optional(),
   slotMinutes: z.coerce.number().int().min(10).max(120).optional()

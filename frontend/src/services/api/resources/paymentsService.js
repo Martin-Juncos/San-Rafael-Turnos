@@ -8,8 +8,8 @@ export const paymentsService = {
   createMercadoPagoPreference: async (appointmentId) => unwrapData(
     await httpClient.post('/payments/mercadopago/preference', { appointmentId })
   ),
-  syncMercadoPago: async (paymentId) => unwrapData(
-    await httpClient.post('/payments/mercadopago/sync', { paymentId })
+  syncMercadoPago: async (appointmentId, paymentId) => unwrapData(
+    await httpClient.post('/payments/mercadopago/sync', { appointmentId, paymentId })
   ),
   getByAppointment: async (appointmentId) => unwrapData(await httpClient.get(`/payments/${appointmentId}`))
 }

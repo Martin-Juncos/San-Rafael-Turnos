@@ -2,6 +2,7 @@ import { ActionResultModal } from '../../components/ui/ActionResultModal'
 import { Card } from '../../components/ui/Card'
 import { DateAndSlotsPicker } from './ReservePage/components/DateAndSlotsPicker'
 import { DoctorPicker } from './ReservePage/components/DoctorPicker'
+import { MercadoPagoWallet } from './ReservePage/components/MercadoPagoWallet'
 import { PatientInfoForm } from './ReservePage/components/PatientInfoForm'
 import { ReserveActions } from './ReservePage/components/ReserveActions'
 import { ReserveHeader } from './ReservePage/components/ReserveHeader'
@@ -80,10 +81,22 @@ export function ReservePage () {
             isPatientRole={reserve.isPatientRole}
             holdResult={reserve.holdResult}
             mercadoPagoLoading={reserve.mercadoPagoLoading}
+            mercadoPagoPreferenceId={reserve.mercadoPagoPreferenceId}
             checkingMercadoPago={reserve.checkingMercadoPago}
             authToken={reserve.auth.token}
             onCreateHold={reserve.createHold}
             onStartMercadoPagoCheckout={reserve.startMercadoPagoCheckout}
+          />
+
+          <MercadoPagoWallet
+            preferenceId={
+              reserve.isPatientRole && reserve.holdResult?.payment?.status === 'pending'
+                ? reserve.mercadoPagoPreferenceId
+                : ''
+            }
+            onReady={reserve.handleMercadoPagoWalletReady}
+            onError={reserve.handleMercadoPagoWalletError}
+            onSubmit={reserve.handleMercadoPagoWalletSubmit}
           />
         </Card>
 

@@ -30,6 +30,7 @@ export function LoginPage () {
     fullName: '',
     dni: '',
     phone: '',
+    email: '',
     streetAndNumber: '',
     city: ''
   })
@@ -75,6 +76,7 @@ export function LoginPage () {
         dni,
         fullName: exists ? (result.patient.fullName || '') : '',
         phone: exists ? (result.patient.phone || '') : '',
+        email: exists ? (result.patient.email || '') : '',
         streetAndNumber: exists ? (result.patient.streetAndNumber || '') : '',
         city: exists ? (result.patient.city || '') : ''
       }))
@@ -93,6 +95,7 @@ export function LoginPage () {
       fullName: patientForm.fullName.trim(),
       dni: normalizeDni(patientForm.dni),
       phone: patientForm.phone.trim(),
+      email: patientForm.email.trim().toLowerCase(),
       streetAndNumber: patientForm.streetAndNumber.trim(),
       city: patientForm.city.trim()
     }
@@ -107,6 +110,10 @@ export function LoginPage () {
     }
     if (!payload.phone || payload.phone.length < 8) {
       setLocalError('Completa un telefono valido.')
+      return
+    }
+    if (!payload.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
+      setLocalError('Completa un email valido.')
       return
     }
     if (!patientExists && (!payload.streetAndNumber || payload.streetAndNumber.length < 3)) {
@@ -124,6 +131,7 @@ export function LoginPage () {
         fullName: payload.fullName,
         dni: payload.dni,
         phone: payload.phone,
+        email: payload.email,
         streetAndNumber: payload.streetAndNumber || undefined,
         city: payload.city || undefined
       })
@@ -177,6 +185,7 @@ export function LoginPage () {
                       fullName: '',
                       dni,
                       phone: '',
+                      email: '',
                       streetAndNumber: '',
                       city: ''
                     })
@@ -213,6 +222,12 @@ export function LoginPage () {
                   onChange={(event) => setPatientForm((prev) => ({ ...prev, phone: event.target.value }))}
                 />
                 <Input
+                  label='Email'
+                  type='email'
+                  value={patientForm.email}
+                  onChange={(event) => setPatientForm((prev) => ({ ...prev, email: event.target.value }))}
+                />
+                <Input
                   label='Calle y numero'
                   value={patientForm.streetAndNumber}
                   onChange={(event) => setPatientForm((prev) => ({ ...prev, streetAndNumber: event.target.value }))}
@@ -228,12 +243,13 @@ export function LoginPage () {
                     variant='secondary'
                     onClick={() => {
                       setPatientForm({
-                        fullName: '',
-                        dni: '',
-                        phone: '',
-                        streetAndNumber: '',
-                        city: ''
-                      })
+                      fullName: '',
+                      dni: '',
+                      phone: '',
+                      email: '',
+                      streetAndNumber: '',
+                      city: ''
+                    })
                       setPatientLookupDone(false)
                       setPatientExists(false)
                       setLocalError('')
@@ -276,7 +292,7 @@ export function LoginPage () {
           <li>Medico: medico@mail.com / 30111222 (DNI)</li>
         </ul>
         <p className='text-xs text-emerald-900/80'>
-          Pacientes: primero DNI, luego autocompleta si existe o solicita datos para primer ingreso (sin OTP).
+          Pacientes: primero DNI, luego autocompleta si existe o solicita datos para primer ingreso, incluyendo email para pagos con Mercado Pago.
         </p>
       </Card>
     </div>

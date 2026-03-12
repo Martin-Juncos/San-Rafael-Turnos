@@ -17,6 +17,12 @@ export const phoneSchema = z
   .transform((value) => normalizePhone(value))
   .refine((value) => value.length >= 8 && value.length <= 20, 'Telefono invalido')
 
+export const emailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .email('Email invalido')
+
 export const isoDateSchema = z.string().regex(ISO_DATE_REGEX, 'Fecha invalida. Formato esperado: YYYY-MM-DD')
 export const hhmmSchema = z.string().regex(TIME_HHMM_REGEX, 'Hora invalida. Formato esperado: HH:mm')
 export const hhmmWithOptionalSecondsSchema = z.string().regex(

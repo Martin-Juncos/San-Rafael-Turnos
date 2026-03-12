@@ -75,6 +75,13 @@ export function PatientInfoForm ({
               onChange={(event) => updateFormField('phone', event.target.value)}
             />
             <Input
+              label='Email'
+              type='email'
+              value={form.email}
+              onChange={(event) => updateFormField('email', event.target.value)}
+              placeholder='nombre@correo.com'
+            />
+            <Input
               label='Calle y numero'
               value={form.streetAndNumber}
               onChange={(event) => updateFormField('streetAndNumber', event.target.value)}
