@@ -8,6 +8,7 @@ export function ReserveActions ({
   mercadoPagoLoading,
   mercadoPagoPreferenceId,
   checkingMercadoPago,
+  mercadoPagoReturnPending,
   authToken,
   onCreateHold,
   onStartMercadoPagoCheckout
@@ -40,7 +41,9 @@ export function ReserveActions ({
       {holdResult?.appointment?.id && holdResult?.payment?.status === 'pending'
         ? (
           <p className='text-xs text-emerald-900/75'>
-            El turno queda confirmado cuando Mercado Pago devuelve el pago y el backend sincroniza el estado.
+            {mercadoPagoReturnPending
+              ? 'Volviste de Mercado Pago. Estamos verificando el estado del pago con el servidor.'
+              : 'El turno quedara confirmado cuando el backend reciba y valide el pago de Mercado Pago.'}
             {checkingMercadoPago ? ' Verificando estado...' : ''}
           </p>
           )

@@ -143,6 +143,7 @@ export function useReservePageState () {
     holdResult: submit.holdResult,
     patientAppointments: submit.patientAppointments,
     checkingMercadoPago: submit.checkingMercadoPago,
+    mercadoPagoReturnPending: submit.mercadoPagoReturnPending,
     mercadoPagoLoading: submit.mercadoPagoLoading,
     mercadoPagoPreferenceId: submit.mercadoPagoPreferenceId,
     summaryRef: submit.summaryRef,

@@ -28,6 +28,7 @@ export function useReserveSubmit ({
   const [holdResult, setHoldResult] = useState(null)
   const [patientAppointments, setPatientAppointments] = useState([])
   const [checkingMercadoPago, setCheckingMercadoPago] = useState(false)
+  const [mercadoPagoReturnPending, setMercadoPagoReturnPending] = useState(false)
   const [mercadoPagoLoading, setMercadoPagoLoading] = useState(false)
   const [mercadoPagoPreferenceId, setMercadoPagoPreferenceId] = useState('')
   const summaryRef = useRef(null)
@@ -83,6 +84,7 @@ export function useReserveSubmit ({
     const syncReturn = async () => {
       setError('')
       setPaymentError('')
+      setMercadoPagoReturnPending(cameFromMercadoPago)
 
       try {
         if (!appointmentId) {
@@ -115,16 +117,21 @@ export function useReserveSubmit ({
         if (cameFromMercadoPago) {
           if (payment.status === 'paid') {
             setSuccess('Pago aprobado y validado. Tu turno quedo confirmado.')
-          } else if (syncError) {
+            setMercadoPagoReturnPending(false)
+          } else if (syncError && payment.status !== 'pending') {
             setPaymentError(syncError.message || 'No se pudo validar el pago devuelto por Mercado Pago.')
-          } else if (mpStatus === 'success' || paymentId) {
-            setSuccess('Recibimos tu regreso de Mercado Pago. Estamos validando el pago.')
+            setMercadoPagoReturnPending(false)
+          } else if (payment.status === 'pending') {
+            setSuccess('Volviste de Mercado Pago. Estamos verificando el estado del pago con el servidor.')
           } else if (mpStatus === 'failure') {
             setError('El pago en Mercado Pago fue rechazado o cancelado.')
+            setMercadoPagoReturnPending(false)
           } else if (mpStatus === 'pending' || providerStatus === 'pending' || providerStatus === 'in_process') {
             setSuccess('Pago pendiente de acreditacion. Te avisaremos cuando se confirme.')
+            setMercadoPagoReturnPending(false)
           } else if (providerStatus === 'rejected' || providerStatus === 'cancelled') {
             setError('El pago en Mercado Pago fue rechazado o cancelado.')
+            setMercadoPagoReturnPending(false)
           }
         }
 
@@ -135,6 +142,7 @@ export function useReserveSubmit ({
       } catch (apiError) {
         if (!isCancelled) {
           setPaymentError(apiError.message || 'No se pudo validar el pago devuelto por Mercado Pago.')
+          setMercadoPagoReturnPending(false)
           if (cameFromMercadoPago) {
             clearQuery()
           }
@@ -153,6 +161,7 @@ export function useReserveSubmit ({
     if (auth.role !== 'patient') return
     if (!holdResult?.appointment?.id) return
     if (holdResult?.payment?.status !== 'pending') return
+    if (!mercadoPagoReturnPending && !holdResult?.payment?.preferenceId) return
 
     let isCancelled = false
 
@@ -173,8 +182,11 @@ export function useReserveSubmit ({
         if (payment.status === 'paid' && !webhookPaidNotifiedRef.current) {
           webhookPaidNotifiedRef.current = true
           setMercadoPagoPreferenceId('')
+          setMercadoPagoReturnPending(false)
           setSuccess('Pago aprobado y validado por Mercado Pago. Tu turno quedo confirmado.')
           await loadPatientAppointments()
+        } else if (payment.status !== 'pending') {
+          setMercadoPagoReturnPending(false)
         }
       } catch (_apiError) {
         // Best effort: we keep the page usable even if a polling tick fails.
@@ -188,13 +200,22 @@ export function useReserveSubmit ({
     refreshPaymentStatus().catch(() => {})
     const intervalId = window.setInterval(() => {
       refreshPaymentStatus().catch(() => {})
-    }, 5000)
+    }, mercadoPagoReturnPending ? 3000 : 8000)
 
     return () => {
       isCancelled = true
       window.clearInterval(intervalId)
     }
-  }, [auth.role, holdResult?.appointment?.id, holdResult?.payment?.status, loadAppointmentReservation, loadPatientAppointments, setSuccess])
+  }, [
+    auth.role,
+    holdResult?.appointment?.id,
+    holdResult?.payment?.status,
+    holdResult?.payment?.preferenceId,
+    loadAppointmentReservation,
+    loadPatientAppointments,
+    mercadoPagoReturnPending,
+    setSuccess
+  ])
 
   const createHold = async () => {
     setError('')
@@ -260,6 +281,7 @@ export function useReserveSubmit ({
       const data = await appointmentsService.create(payload)
       setHoldResult(data)
       setMercadoPagoPreferenceId('')
+      setMercadoPagoReturnPending(false)
       await loadPatientAppointments()
       webhookPaidNotifiedRef.current = false
       setPaymentError('')
@@ -277,6 +299,7 @@ export function useReserveSubmit ({
 
     setError('')
     setPaymentError('')
+    setMercadoPagoReturnPending(false)
     webhookPaidNotifiedRef.current = false
 
     const existingPreferenceId = holdResult?.payment?.preferenceId || mercadoPagoPreferenceId
@@ -378,6 +401,7 @@ export function useReserveSubmit ({
     holdResult,
     patientAppointments,
     checkingMercadoPago,
+    mercadoPagoReturnPending,
     mercadoPagoLoading,
     mercadoPagoPreferenceId,
     summaryRef,
