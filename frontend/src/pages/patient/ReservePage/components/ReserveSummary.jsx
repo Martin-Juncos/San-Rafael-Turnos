@@ -11,7 +11,9 @@ export function ReserveSummary ({
   formatDateLongLabel,
   formatMoney
 }) {
-  const paymentToneClass = currentReservation?.paymentStatus === 'Pagado'
+  const paymentToneClass = currentReservation?.appointmentStatusCode === 'cancelled' && currentReservation?.cancelReason === 'hold_expired'
+    ? 'bg-red-100 text-red-900'
+    : currentReservation?.paymentStatus === 'Pagado'
     ? 'bg-emerald-100 text-emerald-900'
     : currentReservation?.paymentStatus === 'Pendiente'
       ? 'bg-amber-100 text-amber-900'
@@ -29,7 +31,9 @@ export function ReserveSummary ({
               <div className='flex flex-wrap items-center gap-2'>
                 <span className='text-sm font-semibold text-emerald-950'>Estado actual</span>
                 <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${paymentToneClass}`}>
-                  {currentReservation.paymentStatus}
+                  {currentReservation.appointmentStatusCode === 'cancelled' && currentReservation.cancelReason === 'hold_expired'
+                    ? 'Reserva vencida'
+                    : currentReservation.paymentStatus}
                 </span>
                 <span className='rounded-full bg-white/80 px-2.5 py-1 text-xs font-medium text-emerald-900'>
                   Turno: {currentReservation.appointmentStatus}

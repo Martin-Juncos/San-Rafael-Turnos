@@ -15,6 +15,14 @@ export function ReserveActions ({
   onStartMercadoPagoCheckout
 }) {
   const canRetryMercadoPago = holdResult?.payment?.status === 'failed'
+  const isExpiredHold = holdResult?.appointment?.status === 'cancelled' && holdResult?.appointment?.cancelReason === 'hold_expired'
+  const canStartMercadoPago = Boolean(
+    holdResult?.appointment?.id &&
+    !mercadoPagoLoading &&
+    holdResult?.payment?.status !== 'paid' &&
+    !isExpiredHold &&
+    holdResult?.appointment?.status === 'hold'
+  )
 
   return (
     <>
@@ -25,11 +33,7 @@ export function ReserveActions ({
             <Button
               variant='secondary'
               onClick={onStartMercadoPagoCheckout}
-              disabled={
-                !holdResult?.appointment?.id ||
-                mercadoPagoLoading ||
-                holdResult?.payment?.status === 'paid'
-              }
+              disabled={!canStartMercadoPago}
             >
               {mercadoPagoLoading
                 ? 'Cargando Mercado Pago...'
@@ -63,7 +67,9 @@ export function ReserveActions ({
       {holdResult?.appointment?.id && holdResult?.payment?.status === 'pending'
         ? (
           <p className='text-xs text-emerald-900/75'>
-            {mercadoPagoReturnPending
+            {isExpiredHold
+              ? 'La reserva venció y no puede seguir pagándose desde esta pantalla.'
+              : mercadoPagoReturnPending
               ? 'No cierres esta pantalla mientras validamos el estado.'
               : 'Si abandonaste el checkout, puedes retomarlo desde aqui o desde Mis turnos.'}
             {checkingMercadoPago ? ' Verificando estado...' : ''}

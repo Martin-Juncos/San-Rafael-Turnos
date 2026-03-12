@@ -16,6 +16,22 @@ const resolvePaymentUiState = ({ holdResult, mercadoPagoReturnPending, checkingM
     return null
   }
 
+  if (holdResult.appointment.status === 'cancelled' && holdResult.appointment.cancelReason === 'hold_expired') {
+    return {
+      tone: 'danger',
+      title: 'Reserva vencida',
+      description: 'El tiempo para completar el pago expiró. Debes reservar nuevamente para obtener un turno disponible.'
+    }
+  }
+
+  if (holdResult.appointment.status === 'cancelled') {
+    return {
+      tone: 'danger',
+      title: 'Reserva cancelada',
+      description: 'Este turno ya no admite pago ni reintento desde esta pantalla.'
+    }
+  }
+
   if (holdResult.payment.status === 'paid') {
     return {
       tone: 'success',
@@ -151,12 +167,19 @@ export function useReserveSubmit ({
           paymentIntent: prev?.paymentIntent ?? null,
           pricing: prev?.pricing ?? null
         }))
-        setMercadoPagoPreferenceId(payment.status === 'pending' ? (payment.preferenceId || '') : '')
+        setMercadoPagoPreferenceId(
+          appointment.status === 'hold' && payment.status === 'pending'
+            ? (payment.preferenceId || '')
+            : ''
+        )
         await loadPatientAppointments()
 
         if (cameFromMercadoPago) {
           if (payment.status === 'paid') {
             setSuccess('Pago aprobado y validado. Tu turno quedo confirmado.')
+            setMercadoPagoReturnPending(false)
+          } else if (appointment.status === 'cancelled' && appointment.cancelReason === 'hold_expired') {
+            setError('La reserva venció antes de que el pago pudiera confirmarse. Debes generar una nueva reserva.')
             setMercadoPagoReturnPending(false)
           } else if (syncError && payment.status !== 'pending') {
             setPaymentError(syncError.message || 'No se pudo validar el pago devuelto por Mercado Pago.')
@@ -217,7 +240,11 @@ export function useReserveSubmit ({
           paymentIntent: prev?.paymentIntent ?? null,
           pricing: prev?.pricing ?? null
         }))
-        setMercadoPagoPreferenceId(payment.status === 'pending' ? (payment.preferenceId || '') : '')
+        setMercadoPagoPreferenceId(
+          appointment.status === 'hold' && payment.status === 'pending'
+            ? (payment.preferenceId || '')
+            : ''
+        )
 
         if (payment.status === 'paid' && !webhookPaidNotifiedRef.current) {
           webhookPaidNotifiedRef.current = true
@@ -225,6 +252,10 @@ export function useReserveSubmit ({
           setMercadoPagoReturnPending(false)
           setSuccess('Pago aprobado y validado por Mercado Pago. Tu turno quedo confirmado.')
           await loadPatientAppointments()
+        } else if (appointment.status === 'cancelled' && appointment.cancelReason === 'hold_expired') {
+          setMercadoPagoPreferenceId('')
+          setMercadoPagoReturnPending(false)
+          setError('La reserva venció porque no se confirmó el pago dentro del tiempo disponible.')
         } else if (payment.status !== 'pending') {
           setMercadoPagoReturnPending(false)
         }
@@ -254,6 +285,7 @@ export function useReserveSubmit ({
     loadAppointmentReservation,
     loadPatientAppointments,
     mercadoPagoReturnPending,
+    setError,
     setSuccess
   ])
 
@@ -342,12 +374,6 @@ export function useReserveSubmit ({
     setMercadoPagoReturnPending(false)
     webhookPaidNotifiedRef.current = false
 
-    const existingPreferenceId = holdResult?.payment?.preferenceId || mercadoPagoPreferenceId
-    if (existingPreferenceId) {
-      setMercadoPagoPreferenceId(existingPreferenceId)
-      return
-    }
-
     if (!form.email.trim()) {
       setPaymentError('Completa un email del paciente antes de continuar con Mercado Pago.')
       return
@@ -359,7 +385,42 @@ export function useReserveSubmit ({
 
     setMercadoPagoLoading(true)
     try {
-      const preference = await paymentsService.createMercadoPagoPreference(holdResult.appointment.id)
+      const reservation = await loadAppointmentReservation(holdResult.appointment.id)
+      const latestAppointment = reservation.appointment
+      const latestPayment = reservation.payment
+
+      setHoldResult((prev) => ({
+        appointment: latestAppointment,
+        payment: latestPayment,
+        paymentIntent: prev?.paymentIntent ?? null,
+        pricing: prev?.pricing ?? null
+      }))
+
+      if (latestPayment.status === 'paid') {
+        setMercadoPagoPreferenceId('')
+        setSuccess('Ese turno ya tiene el pago confirmado.')
+        return
+      }
+
+      if (latestAppointment.status === 'cancelled' && latestAppointment.cancelReason === 'hold_expired') {
+        setMercadoPagoPreferenceId('')
+        setPaymentError('La reserva venció y ya no admite reintento. Debes reservar nuevamente.')
+        return
+      }
+
+      if (latestAppointment.status !== 'hold') {
+        setMercadoPagoPreferenceId('')
+        setPaymentError('Este turno ya no está disponible para continuar el pago desde esta pantalla.')
+        return
+      }
+
+      const shouldReuseExistingPreference = latestPayment.status === 'pending' && latestPayment.preferenceId
+      if (shouldReuseExistingPreference) {
+        setMercadoPagoPreferenceId(latestPayment.preferenceId)
+        return
+      }
+
+      const preference = await paymentsService.createMercadoPagoPreference(latestAppointment.id)
       const preferenceId = String(preference.preferenceId || preference.id || '')
 
       if (!preferenceId) {
@@ -375,6 +436,7 @@ export function useReserveSubmit ({
             ...prev.payment,
             provider: 'mercadopago',
             status: 'pending',
+            providerStatus: null,
             preferenceId
           }
         }
@@ -427,6 +489,9 @@ export function useReserveSubmit ({
       insuranceName,
       date: reservationDate,
       startTime,
+      appointmentStatusCode: appointment.status,
+      paymentStatusCode: payment?.status || null,
+      cancelReason: appointment.cancelReason || '',
       appointmentStatus: appointmentStatusLabels[appointment.status] || appointment.status,
       paymentStatus: paymentStatusLabels[payment?.status] || payment?.status || 'Sin pago',
       paidAmount

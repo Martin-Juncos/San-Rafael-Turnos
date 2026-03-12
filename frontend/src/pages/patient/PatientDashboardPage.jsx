@@ -302,6 +302,12 @@ export function PatientDashboardPage () {
     return `${item.date} a las ${item.startTime.slice(0, 5)}`
   }
 
+  const canContinueMercadoPago = (appointment) => {
+    return appointment.payment?.provider === 'mercadopago' &&
+      ['pending', 'failed'].includes(appointment.payment?.status) &&
+      appointment.status === 'hold'
+  }
+
   const cancel = async (appointmentId) => {
     setError('')
     setMessage('')
@@ -416,13 +422,20 @@ export function PatientDashboardPage () {
                   <Button variant='danger' className='px-3 py-1.5 text-xs' onClick={() => cancel(appointment.id)}>
                     Cancelar
                   </Button>
-                  {appointment.payment?.status === 'pending' && appointment.payment?.provider === 'mercadopago'
+                  {canContinueMercadoPago(appointment)
                     ? (
                       <Link to={`/reservar?appointmentId=${appointment.id}`} className='inline-flex'>
                         <Button className='px-3 py-1.5 text-xs'>
-                          Continuar pago
+                          {appointment.payment?.status === 'failed' ? 'Reintentar pago' : 'Continuar pago'}
                         </Button>
                       </Link>
+                      )
+                    : null}
+                  {appointment.status === 'cancelled' && appointment.cancelReason === 'hold_expired'
+                    ? (
+                      <span className='inline-flex items-center rounded-full bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-800'>
+                        Reserva vencida
+                      </span>
                       )
                     : null}
                   {appointment.payment?.status === 'pending' && appointment.payment?.provider !== 'mercadopago'
