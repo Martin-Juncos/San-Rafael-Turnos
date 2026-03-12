@@ -31,8 +31,14 @@ export const mapMercadoPagoStatusToLocal = (status) => {
 export const assertMercadoPagoPaymentMatchesAppointment = ({ appointment, mpPayment }) => {
   const externalReference = String(mpPayment?.external_reference || '').trim()
   const metadata = mpPayment?.metadata || {}
-  const metadataAppointmentId = String(metadata.appointmentId || '').trim()
-  const metadataLocalPaymentId = String(metadata.localPaymentId || metadata.paymentId || '').trim()
+  const metadataAppointmentId = String(metadata.appointmentId || metadata.appointment_id || '').trim()
+  const metadataLocalPaymentId = String(
+    metadata.localPaymentId ||
+    metadata.local_payment_id ||
+    metadata.paymentId ||
+    metadata.payment_id ||
+    ''
+  ).trim()
 
   if (externalReference && externalReference !== appointment.id) {
     throw new AppError('El pago no corresponde al turno indicado', 403, 'mercadopago_payment_mismatch')
@@ -77,21 +83,30 @@ const queueAppointmentConfirmationMessage = (appointment, requestId = null) => {
 
 const findAppointmentForMercadoPagoPayment = async (mpPayment, transaction) => {
   const metadata = mpPayment?.metadata || {}
-  const localPaymentId = String(metadata.localPaymentId || metadata.paymentId || '').trim()
-  const appointmentIdFromMetadata = String(metadata.appointmentId || '').trim()
+  const localPaymentId = String(
+    metadata.localPaymentId ||
+    metadata.local_payment_id ||
+    metadata.paymentId ||
+    metadata.payment_id ||
+    ''
+  ).trim()
+  const appointmentIdFromMetadata = String(metadata.appointmentId || metadata.appointment_id || '').trim()
   const providerPaymentId = String(mpPayment?.id || '').trim()
   const preferenceId = String(mpPayment?.preference_id || '').trim()
   const externalReference = String(mpPayment?.external_reference || '').trim()
 
   if (localPaymentId) {
     const payment = await Payment.findByPk(localPaymentId, {
-      include: [{ model: Appointment, as: 'appointment', include: appointmentWithPaymentInclude.filter((item) => item.as !== 'payment') }],
       transaction
     })
-    if (payment?.appointment) {
-      const appointment = payment.appointment
-      appointment.setDataValue('payment', payment)
-      return appointment
+    if (payment) {
+      const appointment = await Appointment.findByPk(payment.appointmentId, {
+        include: appointmentWithPaymentInclude,
+        transaction
+      })
+      if (appointment?.payment) {
+        return appointment
+      }
     }
   }
 
@@ -108,26 +123,32 @@ const findAppointmentForMercadoPagoPayment = async (mpPayment, transaction) => {
   if (providerPaymentId) {
     const payment = await Payment.findOne({
       where: { provider: 'mercadopago', providerPaymentId },
-      include: [{ model: Appointment, as: 'appointment', include: appointmentWithPaymentInclude.filter((item) => item.as !== 'payment') }],
       transaction
     })
-    if (payment?.appointment) {
-      const appointment = payment.appointment
-      appointment.setDataValue('payment', payment)
-      return appointment
+    if (payment) {
+      const appointment = await Appointment.findByPk(payment.appointmentId, {
+        include: appointmentWithPaymentInclude,
+        transaction
+      })
+      if (appointment?.payment) {
+        return appointment
+      }
     }
   }
 
   if (preferenceId) {
     const payment = await Payment.findOne({
       where: { provider: 'mercadopago', preferenceId },
-      include: [{ model: Appointment, as: 'appointment', include: appointmentWithPaymentInclude.filter((item) => item.as !== 'payment') }],
       transaction
     })
-    if (payment?.appointment) {
-      const appointment = payment.appointment
-      appointment.setDataValue('payment', payment)
-      return appointment
+    if (payment) {
+      const appointment = await Appointment.findByPk(payment.appointmentId, {
+        include: appointmentWithPaymentInclude,
+        transaction
+      })
+      if (appointment?.payment) {
+        return appointment
+      }
     }
   }
 
@@ -199,18 +220,27 @@ export const syncMercadoPagoPaymentLocally = async ({
 
   await sequelize.transaction(async (transaction) => {
     const lockedAppointment = await Appointment.findByPk(appointmentId, {
-      include: appointmentWithPaymentInclude,
       transaction,
       lock: transaction.LOCK.UPDATE
     })
 
-    if (!lockedAppointment || !lockedAppointment.payment) {
+    if (!lockedAppointment) {
+      throw new AppError('Pago no encontrado', 404, 'payment_not_found')
+    }
+
+    const lockedPayment = await Payment.findOne({
+      where: { appointmentId },
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    })
+
+    if (!lockedPayment) {
       throw new AppError('Pago no encontrado', 404, 'payment_not_found')
     }
 
     if (webhookNotification) {
       webhookRecorded = await recordWebhookEvent({
-        paymentId: lockedAppointment.payment.id,
+        paymentId: lockedPayment.id,
         providerPaymentId,
         providerStatus,
         preferenceId,
@@ -223,21 +253,21 @@ export const syncMercadoPagoPaymentLocally = async ({
       })
     }
 
-    becamePaid = lockedAppointment.payment.status !== 'paid' && nextStatus === 'paid'
+    becamePaid = lockedPayment.status !== 'paid' && nextStatus === 'paid'
 
-    await lockedAppointment.payment.update(
+    await lockedPayment.update(
       {
         provider: 'mercadopago',
         status: nextStatus,
-        externalRef: providerPaymentId || lockedAppointment.payment.externalRef,
-        preferenceId: preferenceId || lockedAppointment.payment.preferenceId,
-        providerPaymentId: providerPaymentId || lockedAppointment.payment.providerPaymentId,
+        externalRef: providerPaymentId || lockedPayment.externalRef,
+        preferenceId: preferenceId || lockedPayment.preferenceId,
+        providerPaymentId: providerPaymentId || lockedPayment.providerPaymentId,
         providerStatus,
-        lastWebhookPayload: webhookNotification?.payload || lockedAppointment.payment.lastWebhookPayload,
+        lastWebhookPayload: webhookNotification?.payload || lockedPayment.lastWebhookPayload,
         paidAt: nextStatus === 'paid'
           ? new Date(mpPayment.date_approved || Date.now())
           : nextStatus === 'refunded'
-            ? lockedAppointment.payment.paidAt
+            ? lockedPayment.paidAt
             : null
       },
       { transaction }
@@ -258,7 +288,7 @@ export const syncMercadoPagoPaymentLocally = async ({
         actorId,
         action: 'PAYMENT_MERCADOPAGO_SYNCED',
         entity: 'Payment',
-        entityId: lockedAppointment.payment.id,
+        entityId: lockedPayment.id,
         meta: {
           appointmentId: lockedAppointment.id,
           providerPaymentId,
@@ -307,7 +337,7 @@ export const processMercadoPagoWebhookPayment = async ({
     appointmentId: appointment.id,
     mpPayment,
     actorRole: 'system',
-    actorId: 'mercadopago:webhook',
+    actorId: null,
     webhookNotification
   })
 

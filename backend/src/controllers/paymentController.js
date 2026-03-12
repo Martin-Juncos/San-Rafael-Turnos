@@ -254,7 +254,13 @@ const extractMercadoPagoWebhookNotification = (req) => {
   const webhookTopic = String(body.type || body.topic || query.type || query.topic || '').trim().toLowerCase()
   const webhookAction = String(body.action || '').trim() || null
   const webhookEventId = String(body.id || '').trim() || null
-  const providerPaymentId = String(body.data?.id || query['data.id'] || '').trim()
+  const providerPaymentId = String(
+    body.data?.id ||
+    body.resource ||
+    query['data.id'] ||
+    query.id ||
+    ''
+  ).trim()
 
   return {
     webhookTopic,
