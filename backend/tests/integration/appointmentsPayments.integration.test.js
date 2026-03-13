@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken'
 import request from 'supertest'
 import { Op, QueryTypes } from 'sequelize'
 import { createDbTestHarness } from '../helpers/dbTestHarness.js'
-import { buildAppointmentRequestPayload } from '../helpers/factories.js'
+import { buildAppointmentRequestPayload, buildPatientPayload } from '../helpers/factories.js'
 import { seedBaselineFixtures } from '../helpers/fixtures.js'
 
 const buildAccessToken = (claims) => {
@@ -15,6 +15,12 @@ const buildAccessToken = (claims) => {
 }
 
 const buildAuthorizationHeader = (claims) => `Bearer ${buildAccessToken(claims)}`
+const buildPatientAuthHeader = (patient) => buildAuthorizationHeader({
+  sub: patient.id,
+  role: 'patient',
+  patientId: patient.id,
+  dni: patient.dni
+})
 
 const harness = createDbTestHarness()
 let app
@@ -218,13 +224,145 @@ test('Turnos real DB: slots + concurrencia evita doble booking en mismo horario'
   assert.equal(sameSlotAppointments.length, 1)
 })
 
-test('Pago mock real DB: pending -> paid y turno confirmado', async () => {
-  const patientAuth = buildAuthorizationHeader({
-    sub: fixtures.patient.id,
-    role: 'patient',
-    patientId: fixtures.patient.id,
-    dni: fixtures.patient.dni
+test('Turnos real DB: paciente autenticado no puede reservar con un DNI distinto al de su sesion', async () => {
+  const patientAuth = buildPatientAuthHeader(fixtures.patient)
+
+  const mismatchedPayload = buildAppointmentRequestPayload({
+    doctorId: fixtures.doctor.id,
+    specialtyId: fixtures.specialty.id,
+    date: fixtures.appointmentDate,
+    startTime: '10:30',
+    patient: {
+      ...fixtures.patient,
+      dni: '30999888'
+    }
   })
+
+  const response = await request(app)
+    .post('/api/appointments')
+    .set('Authorization', patientAuth)
+    .send(mismatchedPayload)
+
+  assert.equal(response.status, 403)
+  assert.equal(response.body?.ok, false)
+  assert.equal(response.body?.error?.code, 'dni_mismatch')
+
+  const persistedAppointments = await models.Appointment.count()
+  assert.equal(persistedAppointments, 0)
+})
+
+test('Turnos real DB: un slot reservado deja de aparecer como disponible', async () => {
+  const patientAuth = buildPatientAuthHeader(fixtures.patient)
+
+  const beforeResponse = await request(app)
+    .get('/api/slots')
+    .query({
+      doctorId: fixtures.doctor.id,
+      date: fixtures.appointmentDate
+    })
+
+  assert.equal(beforeResponse.status, 200)
+  assert.equal(
+    beforeResponse.body?.data?.slots?.some((slot) => slot.startTime === '10:30'),
+    true
+  )
+
+  const appointmentPayload = buildAppointmentRequestPayload({
+    doctorId: fixtures.doctor.id,
+    specialtyId: fixtures.specialty.id,
+    date: fixtures.appointmentDate,
+    startTime: '10:30',
+    patient: fixtures.patient
+  })
+
+  const createAppointmentResponse = await request(app)
+    .post('/api/appointments')
+    .set('Authorization', patientAuth)
+    .send(appointmentPayload)
+
+  assert.equal(createAppointmentResponse.status, 201)
+
+  const afterResponse = await request(app)
+    .get('/api/slots')
+    .query({
+      doctorId: fixtures.doctor.id,
+      date: fixtures.appointmentDate
+    })
+
+  assert.equal(afterResponse.status, 200)
+  assert.equal(
+    afterResponse.body?.data?.slots?.some((slot) => slot.startTime === '10:30'),
+    false
+  )
+})
+
+test('Aislamiento real DB: otro paciente no puede acceder ni operar sobre turno y pago ajenos', async () => {
+  const ownerAuth = buildPatientAuthHeader(fixtures.patient)
+  const otherPatient = await models.Patient.create(buildPatientPayload({
+    dni: '30999887',
+    fullName: 'Paciente Aislado',
+    phone: '+5492615553030'
+  }))
+  const otherPatientAuth = buildPatientAuthHeader(otherPatient)
+
+  const appointmentPayload = buildAppointmentRequestPayload({
+    doctorId: fixtures.doctor.id,
+    specialtyId: fixtures.specialty.id,
+    date: fixtures.appointmentDate,
+    startTime: '11:00',
+    patient: fixtures.patient
+  })
+
+  const createAppointmentResponse = await request(app)
+    .post('/api/appointments')
+    .set('Authorization', ownerAuth)
+    .send(appointmentPayload)
+
+  assert.equal(createAppointmentResponse.status, 201)
+
+  const appointmentId = createAppointmentResponse.body?.data?.appointment?.id
+  assert.equal(typeof appointmentId, 'string')
+
+  const ownerMyAppointmentsResponse = await request(app)
+    .get('/api/appointments/my')
+    .set('Authorization', ownerAuth)
+
+  assert.equal(ownerMyAppointmentsResponse.status, 200)
+  assert.equal(ownerMyAppointmentsResponse.body?.data?.length, 1)
+  assert.equal(ownerMyAppointmentsResponse.body?.data?.[0]?.id, appointmentId)
+
+  const otherMyAppointmentsResponse = await request(app)
+    .get('/api/appointments/my')
+    .set('Authorization', otherPatientAuth)
+
+  assert.equal(otherMyAppointmentsResponse.status, 200)
+  assert.equal(otherMyAppointmentsResponse.body?.data?.length, 0)
+
+  const getAppointmentAsOtherPatientResponse = await request(app)
+    .get(`/api/appointments/${appointmentId}`)
+    .set('Authorization', otherPatientAuth)
+
+  assert.equal(getAppointmentAsOtherPatientResponse.status, 403)
+  assert.equal(getAppointmentAsOtherPatientResponse.body?.error?.code, 'forbidden')
+
+  const getPaymentAsOtherPatientResponse = await request(app)
+    .get(`/api/payments/${appointmentId}`)
+    .set('Authorization', otherPatientAuth)
+
+  assert.equal(getPaymentAsOtherPatientResponse.status, 403)
+  assert.equal(getPaymentAsOtherPatientResponse.body?.error?.code, 'forbidden')
+
+  const confirmPaymentAsOtherPatientResponse = await request(app)
+    .post('/api/payments/mock/confirm')
+    .set('Authorization', otherPatientAuth)
+    .send({ appointmentId })
+
+  assert.equal(confirmPaymentAsOtherPatientResponse.status, 403)
+  assert.equal(confirmPaymentAsOtherPatientResponse.body?.error?.code, 'forbidden')
+})
+
+test('Pago mock real DB: pending -> paid y turno confirmado', async () => {
+  const patientAuth = buildPatientAuthHeader(fixtures.patient)
 
   const appointmentPayload = buildAppointmentRequestPayload({
     doctorId: fixtures.doctor.id,
