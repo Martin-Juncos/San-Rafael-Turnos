@@ -48,6 +48,21 @@ export const buildPatientPayload = (overrides = {}) => ({
   city: overrides.city || 'San Rafael'
 })
 
+const resolvePatientFields = (patient = {}) => {
+  const source = {
+    ...(patient.dataValues ?? {}),
+    ...patient
+  }
+
+  return {
+    fullName: source.fullName,
+    dni: source.dni,
+    phone: source.phone,
+    streetAndNumber: source.streetAndNumber,
+    city: source.city
+  }
+}
+
 export const buildAppointmentRequestPayload = ({
   doctorId,
   specialtyId,
@@ -56,17 +71,21 @@ export const buildAppointmentRequestPayload = ({
   startTime = '09:00',
   slotMinutes = DEFAULT_SLOT_MINUTES,
   patient
-}) => ({
-  doctorId,
-  specialtyId,
-  insuranceId,
-  date,
-  startTime,
-  slotMinutes,
-  symptoms: 'Consulta de control',
-  fullName: patient.fullName,
-  dni: patient.dni,
-  phone: patient.phone,
-  streetAndNumber: patient.streetAndNumber,
-  city: patient.city
-})
+}) => {
+  const patientFields = resolvePatientFields(patient)
+
+  return {
+    doctorId,
+    specialtyId,
+    insuranceId,
+    date,
+    startTime,
+    slotMinutes,
+    symptoms: 'Consulta de control',
+    fullName: patientFields.fullName,
+    dni: patientFields.dni,
+    phone: patientFields.phone,
+    streetAndNumber: patientFields.streetAndNumber,
+    city: patientFields.city
+  }
+}
