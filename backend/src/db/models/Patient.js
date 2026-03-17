@@ -30,10 +30,6 @@ export const initPatientModel = (sequelize) => {
       city: {
         type: DataTypes.STRING,
         allowNull: true
-      },
-      birthDate: {
-        type: DataTypes.DATEONLY,
-        allowNull: true
       }
     },
     {

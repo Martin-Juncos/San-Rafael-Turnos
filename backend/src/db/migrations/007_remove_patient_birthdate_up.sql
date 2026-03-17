@@ -1,0 +1,2 @@
+ALTER TABLE "Patient"
+  DROP COLUMN IF EXISTS "birthDate";
