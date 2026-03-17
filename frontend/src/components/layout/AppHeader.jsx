@@ -23,7 +23,7 @@ export function AppHeader () {
   const reserveLink = useReserveLink()
   const identityLabel = auth.role === 'patient'
     ? (auth.patient?.fullName || auth.patient?.dni)
-    : auth.user?.email
+    : (auth.user?.fullName || auth.user?.email)
 
   const handleLogout = () => {
     dispatch(clearSession())

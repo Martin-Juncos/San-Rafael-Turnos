@@ -132,7 +132,7 @@ Checklist rapida de inicio:
 
 - Admin: `admin@mail.com / admin`
 - Clinica: `clinica@mail.com / clinica`
-- Medico: `medico@mail.com / medico`
+- Medico: `medico@mail.com / 30111222`
 - Paciente: ingreso rapido desde pantalla de login con DNI y datos personales
 
 ## Flujo Mercado Pago en desarrollo
@@ -160,10 +160,49 @@ Checklist rapida de inicio:
 - `npm run start`
 - `npm run db:migrate`
 - `npm run db:rollback`
+- `npm run db:reset:operational`
+- `npm run db:reset:demo`
 - `npm run seed`
 - `npm run lint`
 - `npm run test`
 - `npm run audit:db-schema`
+
+## Reset de datos de prueba
+
+Si hiciste muchas pruebas con reservas y pagos, ahora tienes dos caminos seguros desde `backend/`:
+
+```bash
+npm run db:reset:operational
+```
+
+Limpia solo datos operativos de prueba:
+- pacientes
+- turnos
+- pagos y webhooks
+- mensajes
+- notas de consulta
+- bloqueos
+- tokens de sesion
+- auditoria
+
+Conserva medicos, especialidades, secretarias, obras sociales y usuarios staff.
+
+```bash
+npm run db:reset:demo
+```
+
+Hace una limpieza completa de datos operativos y catalogos, y luego vuelve a ejecutar el seed minimo.
+
+Despues de `db:reset:demo`, te quedan de nuevo:
+- Admin: `admin@mail.com / admin`
+- Clinica: `clinica@mail.com / clinica`
+- Medico demo: `medico@mail.com / 30111222`
+- Especialidades, medico y obra social basicos del seed
+
+Luego puedes volver a cargar el resto desde la aplicacion:
+- especialidades, medicos, secretarias y obras sociales desde el panel admin
+- pacientes desde la pantalla de ingreso con DNI
+- turnos desde la reserva normal
 
 ### Frontend
 

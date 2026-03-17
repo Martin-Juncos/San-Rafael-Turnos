@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs'
+import { pathToFileURL } from 'node:url'
 import { sequelize } from '../config/database.js'
 import {
   Specialty,
@@ -59,7 +60,7 @@ const upsertParanoid = async (Model, where, values) => {
   return Model.create(values)
 }
 
-const run = async () => {
+export const runSeed = async () => {
   try {
     await sequelize.authenticate()
 
@@ -136,11 +137,20 @@ const run = async () => {
     })
 
     logger.info('Seed completado')
-    process.exit(0)
   } catch (error) {
     logger.error({ err: error }, 'Seed error')
-    process.exit(1)
+    throw error
   }
 }
 
-run()
+const isDirectExecution = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href
+
+if (isDirectExecution) {
+  runSeed()
+    .then(() => {
+      process.exit(0)
+    })
+    .catch(() => {
+      process.exit(1)
+    })
+}
