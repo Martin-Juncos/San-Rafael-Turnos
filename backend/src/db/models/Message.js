@@ -18,10 +18,6 @@ export const initMessageModel = (sequelize) => {
         type: DataTypes.ENUM('doctor', 'patient', 'clinic'),
         allowNull: false
       },
-      senderId: {
-        type: DataTypes.UUID,
-        allowNull: true
-      },
       body: {
         type: DataTypes.TEXT,
         allowNull: false

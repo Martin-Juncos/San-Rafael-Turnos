@@ -53,7 +53,6 @@ test('Schema smoke: migraciones crean tablas esperadas en schema temporal', asyn
     'HealthInsurance',
     'Message',
     'Patient',
-    'PatientOtp',
     'Payment',
     'PaymentWebhookEvent',
     'RefreshToken',

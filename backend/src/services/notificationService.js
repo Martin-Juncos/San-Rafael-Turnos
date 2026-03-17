@@ -33,11 +33,3 @@ export const sendWhatsAppMessage = async ({ to, body, templateName = 'default' }
     externalId: `mock-${Date.now()}`
   }
 }
-
-export const sendOtpCode = async ({ dni, phone, code }) => {
-  return sendWhatsAppMessage({
-    to: phone,
-    templateName: 'otp',
-    body: `Codigo de acceso para DNI ${dni}: ${code}`
-  })
-}

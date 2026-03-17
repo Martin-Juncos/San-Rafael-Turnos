@@ -163,10 +163,7 @@ export const createAppointmentWithHold = async ({ payload, auth }, overrides = {
           startTime: payload.startTime,
           endTime,
           symptoms: payload.symptoms ?? null,
-          discountPercentApplied: pricing.discountPercent,
-          status: 'hold',
-          createdByRole: actorRole,
-          createdByUserId: actorId
+          status: 'hold'
         },
         transaction
       })

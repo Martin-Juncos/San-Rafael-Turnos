@@ -31,7 +31,7 @@ export const openapiDocument = {
     '/auth/refresh': { post: { tags: ['Auth'], summary: 'Refresh token con rotacion' } },
     '/auth/logout': { post: { tags: ['Auth'], summary: 'Logout staff' } },
     '/patient/auth/prefill': { get: { tags: ['PatientAuth'], summary: 'Buscar paciente por DNI para autocompletar ingreso' } },
-    '/patient/auth/login': { post: { tags: ['PatientAuth'], summary: 'Login/registro rapido de paciente sin OTP' } },
+    '/patient/auth/login': { post: { tags: ['PatientAuth'], summary: 'Login/registro rapido de paciente' } },
     '/specialties': {
       get: { tags: ['Specialties'], summary: 'Listar especialidades' },
       post: { tags: ['Specialties'], summary: 'Crear especialidad (admin)' }

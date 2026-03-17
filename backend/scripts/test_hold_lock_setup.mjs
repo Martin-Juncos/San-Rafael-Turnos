@@ -98,8 +98,6 @@ export const runHoldLockSetup = async () => {
     endTime,
     symptoms: marker,
     status: 'hold',
-    createdByRole: 'clinic',
-    createdByUserId: null,
     createdAt: staleCreatedAt,
     updatedAt: staleCreatedAt
   })

@@ -73,7 +73,6 @@ export const postMessageByAppointment = async (req, res) => {
   const message = await Message.create({
     appointmentId: appointment.id,
     senderRole: senderRoleFromAuth(req.auth.role),
-    senderId: req.auth.sub,
     body: req.validated.body.body
   })
   ok(res, message, 'message_created', 201)

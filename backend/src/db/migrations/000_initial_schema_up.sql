@@ -73,20 +73,6 @@ BEGIN
     SELECT 1
     FROM pg_type t
     JOIN pg_namespace n ON n.oid = t.typnamespace
-    WHERE t.typname = 'enum_Appointment_createdByRole'
-      AND n.nspname = current_schema()
-  ) THEN
-    CREATE TYPE "enum_Appointment_createdByRole" AS ENUM ('admin', 'clinic', 'doctor', 'patient');
-  END IF;
-END
-$$;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_type t
-    JOIN pg_namespace n ON n.oid = t.typnamespace
     WHERE t.typname = 'enum_Payment_provider'
       AND n.nspname = current_schema()
   ) THEN
@@ -312,9 +298,6 @@ CREATE TABLE IF NOT EXISTS "Appointment" (
   "doctorNotes" TEXT,
   status "enum_Appointment_status" NOT NULL DEFAULT 'requested',
   "cancelReason" VARCHAR(255),
-  "discountPercentApplied" NUMERIC(5,2) NOT NULL DEFAULT 0,
-  "createdByRole" "enum_Appointment_createdByRole" NOT NULL,
-  "createdByUserId" UUID,
   "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "deletedAt" TIMESTAMPTZ,
@@ -390,7 +373,6 @@ CREATE TABLE IF NOT EXISTS "Message" (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   "appointmentId" UUID NOT NULL,
   "senderRole" "enum_Message_senderRole" NOT NULL,
-  "senderId" UUID,
   body TEXT NOT NULL,
   "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT message_appointment_id_fk_base
@@ -408,16 +390,6 @@ CREATE TABLE IF NOT EXISTS "AuditLog" (
   entity VARCHAR(255) NOT NULL,
   "entityId" UUID,
   meta JSONB DEFAULT '{}'::jsonb,
-  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS "PatientOtp" (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  dni VARCHAR(255) NOT NULL,
-  phone VARCHAR(255) NOT NULL,
-  "codeHash" VARCHAR(255) NOT NULL,
-  "expiresAt" TIMESTAMPTZ NOT NULL,
-  "consumedAt" TIMESTAMPTZ,
   "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -480,12 +452,6 @@ CREATE INDEX IF NOT EXISTS doctoravailability_doctor_day_idx
 
 CREATE INDEX IF NOT EXISTS doctorblock_doctor_date_idx
   ON "DoctorBlock" ("doctorId", date);
-
-CREATE INDEX IF NOT EXISTS patientotp_dni_idx
-  ON "PatientOtp" (dni);
-
-CREATE INDEX IF NOT EXISTS patientotp_expires_at_idx
-  ON "PatientOtp" ("expiresAt");
 
 CREATE INDEX IF NOT EXISTS appointment_doctor_date_idx
   ON "Appointment" ("doctorId", date);

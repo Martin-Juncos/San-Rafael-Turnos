@@ -62,19 +62,6 @@ export const initAppointmentModel = (sequelize) => {
       cancelReason: {
         type: DataTypes.STRING,
         allowNull: true
-      },
-      discountPercentApplied: {
-        type: DataTypes.DECIMAL(5, 2),
-        allowNull: false,
-        defaultValue: 0
-      },
-      createdByRole: {
-        type: DataTypes.ENUM('admin', 'clinic', 'doctor', 'patient'),
-        allowNull: false
-      },
-      createdByUserId: {
-        type: DataTypes.UUID,
-        allowNull: true
       }
     },
     {

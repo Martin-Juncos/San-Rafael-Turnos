@@ -28,7 +28,6 @@ const schema = z.object({
   NEWS_CACHE_TTL_MINUTES: z.coerce.number().int().min(5).max(1440).default(30),
   NEWS_FETCH_TIMEOUT_MS: z.coerce.number().int().min(2000).max(20000).default(9000),
   NEWS_MAX_ITEMS: z.coerce.number().int().min(5).max(50).default(30),
-  OTP_TTL_SECONDS: z.coerce.number().int().min(60).max(1800).default(300),
   APPOINTMENT_HOLD_MINUTES: z.coerce.number().int().min(1).max(60).default(10),
   HOLD_EXPIRATION_JOB_INTERVAL_MINUTES: z.coerce.number().int().min(1).max(5).default(1),
   PAYMENT_DEFAULT_CURRENCY: z.string().default('ARS'),

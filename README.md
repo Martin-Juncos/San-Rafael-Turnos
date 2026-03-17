@@ -133,7 +133,7 @@ Checklist rapida de inicio:
 - Admin: `admin@mail.com / admin`
 - Clinica: `clinica@mail.com / clinica`
 - Medico: `medico@mail.com / medico`
-- Paciente: OTP desde pantalla de login (en desarrollo se informa `debugCode`)
+- Paciente: ingreso rapido desde pantalla de login con DNI y datos personales
 
 ## Flujo Mercado Pago en desarrollo
 
@@ -177,7 +177,6 @@ Checklist rapida de inicio:
 
 - JWT access token de 15m.
 - Refresh token con rotacion y revocacion.
-- OTP hasheado.
 - Rate limit global y para rutas sensibles.
 - Validacion de input con Zod.
 - Guardrails anti doble booking por transaccion + indice unico parcial.

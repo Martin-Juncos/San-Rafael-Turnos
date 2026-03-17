@@ -7,7 +7,6 @@ import { initDoctorModel, Doctor } from './Doctor.js'
 import { initDoctorAvailabilityModel, DoctorAvailability } from './DoctorAvailability.js'
 import { initDoctorBlockModel, DoctorBlock } from './DoctorBlock.js'
 import { initPatientModel, Patient } from './Patient.js'
-import { initPatientOtpModel, PatientOtp } from './PatientOtp.js'
 import { initAppointmentModel, Appointment } from './Appointment.js'
 import { initPaymentModel, Payment } from './Payment.js'
 import { initPaymentWebhookEventModel, PaymentWebhookEvent } from './PaymentWebhookEvent.js'
@@ -30,7 +29,6 @@ export const initModels = () => {
   initDoctorAvailabilityModel(sequelize)
   initDoctorBlockModel(sequelize)
   initPatientModel(sequelize)
-  initPatientOtpModel(sequelize)
   initAppointmentModel(sequelize)
   initPaymentModel(sequelize)
   initPaymentWebhookEventModel(sequelize)
@@ -122,7 +120,6 @@ export {
   DoctorAvailability,
   DoctorBlock,
   Patient,
-  PatientOtp,
   Appointment,
   Payment,
   PaymentWebhookEvent,

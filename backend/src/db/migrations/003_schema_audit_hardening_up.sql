@@ -58,10 +58,6 @@ ALTER TABLE "Appointment"
   ADD CONSTRAINT appointment_end_time_gt_start_time_chk
   CHECK ("endTime" > "startTime") NOT VALID;
 
-ALTER TABLE "Appointment"
-  ADD CONSTRAINT appointment_discount_percent_range_chk
-  CHECK ("discountPercentApplied" >= 0 AND "discountPercentApplied" <= 100) NOT VALID;
-
 ALTER TABLE "DoctorAvailability"
   ADD CONSTRAINT doctor_availability_day_of_week_range_chk
   CHECK ("dayOfWeek" BETWEEN 0 AND 6) NOT VALID;
@@ -79,7 +75,6 @@ ALTER TABLE "Payment"
   CHECK (amount >= 0) NOT VALID;
 
 ALTER TABLE "Appointment" VALIDATE CONSTRAINT appointment_end_time_gt_start_time_chk;
-ALTER TABLE "Appointment" VALIDATE CONSTRAINT appointment_discount_percent_range_chk;
 ALTER TABLE "DoctorAvailability" VALIDATE CONSTRAINT doctor_availability_day_of_week_range_chk;
 ALTER TABLE "DoctorAvailability" VALIDATE CONSTRAINT doctor_availability_slot_minutes_positive_chk;
 ALTER TABLE "DoctorBlock" VALIDATE CONSTRAINT doctor_block_end_time_gt_start_time_chk;
