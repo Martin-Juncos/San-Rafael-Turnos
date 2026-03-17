@@ -138,7 +138,6 @@ const recoverUnauthorizedRequest = async (error) => {
           fullName: stored.patient.fullName,
           dni: stored.patient.dni,
           phone: stored.patient.phone,
-          email: stored.patient.email || undefined,
           streetAndNumber: stored.patient.streetAndNumber || undefined,
           city: stored.patient.city || undefined
         })

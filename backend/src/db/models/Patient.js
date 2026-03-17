@@ -34,10 +34,6 @@ export const initPatientModel = (sequelize) => {
       birthDate: {
         type: DataTypes.DATEONLY,
         allowNull: true
-      },
-      email: {
-        type: DataTypes.STRING,
-        allowNull: true
       }
     },
     {

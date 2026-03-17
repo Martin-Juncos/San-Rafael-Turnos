@@ -20,7 +20,6 @@ export function useReserveForm ({
     fullName: auth.patient?.fullName || '',
     dni: auth.patient?.dni || '',
     phone: auth.patient?.phone || '',
-    email: auth.patient?.email || '',
     streetAndNumber: auth.patient?.streetAndNumber || '',
     city: auth.patient?.city || '',
     symptoms: ''
@@ -43,7 +42,6 @@ export function useReserveForm ({
         fullName: auth.patient?.fullName || prev.fullName,
         dni: auth.patient?.dni || prev.dni,
         phone: auth.patient?.phone || prev.phone,
-        email: auth.patient?.email || prev.email,
         streetAndNumber: auth.patient?.streetAndNumber || prev.streetAndNumber,
         city: auth.patient?.city || prev.city
       }))
@@ -58,7 +56,6 @@ export function useReserveForm ({
       fullName: '',
       dni: '',
       phone: '',
-      email: '',
       streetAndNumber: '',
       city: ''
     }))
@@ -67,7 +64,6 @@ export function useReserveForm ({
     auth.patient?.fullName,
     auth.patient?.dni,
     auth.patient?.phone,
-    auth.patient?.email,
     auth.patient?.streetAndNumber,
     auth.patient?.city
   ])
@@ -79,7 +75,6 @@ export function useReserveForm ({
       dni,
       fullName: '',
       phone: '',
-      email: '',
       streetAndNumber: '',
       city: ''
     }))
@@ -111,7 +106,6 @@ export function useReserveForm ({
         dni,
         fullName: exists ? (result.patient.fullName || '') : '',
         phone: exists ? (result.patient.phone || '') : '',
-        email: exists ? (result.patient.email || '') : '',
         streetAndNumber: exists ? (result.patient.streetAndNumber || '') : '',
         city: exists ? (result.patient.city || '') : ''
       }))

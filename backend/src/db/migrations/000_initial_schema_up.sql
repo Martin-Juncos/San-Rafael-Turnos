@@ -220,7 +220,6 @@ CREATE TABLE IF NOT EXISTS "Patient" (
   "streetAndNumber" VARCHAR(255),
   city VARCHAR(255),
   "birthDate" DATE,
-  email VARCHAR(255),
   "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT patient_dni_uq UNIQUE (dni)

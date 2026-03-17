@@ -34,16 +34,13 @@ const defaultDependencies = {
   writeAuditLog
 }
 
-const normalizePatientPayload = ({ fullName, dni, phone, email, streetAndNumber, city }) => {
+const normalizePatientPayload = ({ fullName, dni, phone, streetAndNumber, city }) => {
   const normalized = {
     fullName: fullName.trim(),
     dni: String(dni).replace(/\D/g, ''),
     phone: String(phone).replace(/[^\d+]/g, '')
   }
 
-  if (typeof email !== 'undefined') {
-    normalized.email = String(email).trim().toLowerCase() || null
-  }
   if (typeof streetAndNumber !== 'undefined') {
     normalized.streetAndNumber = streetAndNumber.trim() || null
   }
@@ -117,7 +114,6 @@ export const createAppointmentWithHold = async ({ payload, auth }, overrides = {
           dni: patientInput.dni,
           fullName: patientInput.fullName,
           phone: patientInput.phone,
-          email: patientInput.email ?? null,
           streetAndNumber: patientInput.streetAndNumber ?? null,
           city: patientInput.city ?? null
         },
@@ -127,9 +123,6 @@ export const createAppointmentWithHold = async ({ payload, auth }, overrides = {
       const patientUpdatePayload = {
         fullName: patientInput.fullName,
         phone: patientInput.phone
-      }
-      if ('email' in patientInput) {
-        patientUpdatePayload.email = patientInput.email
       }
       if ('streetAndNumber' in patientInput) {
         patientUpdatePayload.streetAndNumber = patientInput.streetAndNumber

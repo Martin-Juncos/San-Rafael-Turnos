@@ -2,14 +2,13 @@ import { z } from 'zod'
 import { Patient } from '../db/models/index.js'
 import { signAccessToken } from '../utils/jwt.js'
 import { ok } from '../utils/response.js'
-import { dniSchema, emailSchema, phoneSchema } from '../validators/common.js'
+import { dniSchema, phoneSchema } from '../validators/common.js'
 
 export const patientLoginSchema = z.object({
   body: z.object({
     fullName: z.string().min(3).max(120),
     dni: dniSchema,
     phone: phoneSchema,
-    email: emailSchema.optional(),
     streetAndNumber: z.string().min(3).max(160).optional(),
     city: z.string().min(2).max(120).optional()
   }),
@@ -29,8 +28,6 @@ export const loginPatient = async (req, res) => {
   const fullName = req.validated.body.fullName.trim()
   const dni = req.validated.body.dni
   const phone = req.validated.body.phone
-  const hasEmail = typeof req.validated.body.email !== 'undefined'
-  const email = hasEmail ? req.validated.body.email.trim().toLowerCase() : null
   const hasStreetAndNumber = typeof req.validated.body.streetAndNumber !== 'undefined'
   const hasCity = typeof req.validated.body.city !== 'undefined'
   const streetAndNumber = hasStreetAndNumber ? req.validated.body.streetAndNumber.trim() : null
@@ -42,7 +39,6 @@ export const loginPatient = async (req, res) => {
       dni,
       fullName,
       phone,
-      email: email || null,
       streetAndNumber: streetAndNumber || null,
       city: city || null
     }
@@ -53,9 +49,6 @@ export const loginPatient = async (req, res) => {
     phone
   }
 
-  if (hasEmail) {
-    updatePayload.email = email || null
-  }
   if (hasStreetAndNumber) {
     updatePayload.streetAndNumber = streetAndNumber || null
   }
@@ -81,7 +74,6 @@ export const loginPatient = async (req, res) => {
         dni: patient.dni,
         fullName: patient.fullName,
         phone: patient.phone,
-        email: patient.email,
         streetAndNumber: patient.streetAndNumber,
         city: patient.city
       }
@@ -95,7 +87,7 @@ export const prefillPatientByDni = async (req, res) => {
 
   const patient = await Patient.findOne({
     where: { dni },
-    attributes: ['dni', 'fullName', 'phone', 'email', 'streetAndNumber', 'city']
+    attributes: ['dni', 'fullName', 'phone', 'streetAndNumber', 'city']
   })
 
   ok(
@@ -107,7 +99,6 @@ export const prefillPatientByDni = async (req, res) => {
             dni: patient.dni,
             fullName: patient.fullName,
             phone: patient.phone,
-            email: patient.email,
             streetAndNumber: patient.streetAndNumber,
             city: patient.city
           }

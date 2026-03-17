@@ -9,8 +9,6 @@ import {
   paymentStatusLabels
 } from '../reserveUtils'
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
 const resolvePaymentUiState = ({ holdResult, mercadoPagoReturnPending, checkingMercadoPago }) => {
   if (!holdResult?.appointment || !holdResult?.payment) {
     return null
@@ -321,14 +319,6 @@ export function useReserveSubmit ({
       setError('Completa un telefono valido del paciente.')
       return
     }
-    if (!form.email.trim()) {
-      setError('Completa un email del paciente para continuar.')
-      return
-    }
-    if (form.email.trim() && !EMAIL_REGEX.test(form.email.trim())) {
-      setError('Completa un email valido del paciente.')
-      return
-    }
     if (isStaffBooking && !patientExists && (!form.streetAndNumber.trim() || form.streetAndNumber.trim().length < 3)) {
       setError('Completa calle y numero del paciente para continuar.')
       return
@@ -344,7 +334,6 @@ export function useReserveSubmit ({
         fullName: form.fullName.trim(),
         dni: normalizedDni,
         phone: form.phone.trim(),
-        email: form.email.trim() || undefined,
         streetAndNumber: form.streetAndNumber.trim() || undefined,
         city: form.city.trim() || undefined,
         symptoms: form.symptoms.trim() || undefined,
@@ -373,15 +362,6 @@ export function useReserveSubmit ({
     setPaymentError('')
     setMercadoPagoReturnPending(false)
     webhookPaidNotifiedRef.current = false
-
-    if (!form.email.trim()) {
-      setPaymentError('Completa un email del paciente antes de continuar con Mercado Pago.')
-      return
-    }
-    if (!EMAIL_REGEX.test(form.email.trim())) {
-      setPaymentError('Completa un email valido del paciente antes de continuar con Mercado Pago.')
-      return
-    }
 
     setMercadoPagoLoading(true)
     try {
