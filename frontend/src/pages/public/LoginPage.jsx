@@ -26,7 +26,7 @@ export function LoginPage () {
   const [tab, setTab] = useState('patient')
   const [error, setLocalError] = useState('')
 
-  const [staffForm, setStaffForm] = useState({ email: 'admin@mail.com', password: 'admin' })
+  const [staffForm, setStaffForm] = useState({ email: '', password: '' })
   const [patientForm, setPatientForm] = useState({
     fullName: '',
     dni: '',
@@ -270,14 +270,15 @@ export function LoginPage () {
       </Card>
 
       <Card className='space-y-3'>
-        <h2 className='text-lg font-semibold text-emerald-950'>Credenciales demo MVP</h2>
+        <h2 className='text-lg font-semibold text-emerald-950'>Informacion para pacientes</h2>
         <ul className='space-y-2 text-sm text-emerald-900/80'>
-          <li>Admin: admin@mail.com / admin</li>
-          <li>Clinica: clinica@mail.com / clinica</li>
-          <li>Medico: medico@mail.com / 30111222 (DNI)</li>
+          <li>Para sacar un turno, primero debes ingresar como paciente desde esta pantalla.</li>
+          <li>El acceso se hace con tu DNI. Si ya estas registrado, el sistema completa tus datos automaticamente.</li>
+          <li>Si es tu primer ingreso, te vamos a pedir nombre, telefono, direccion y ciudad para crear tu acceso.</li>
+          <li>Antes de ingresar tambien puedes consultar especialidades, profesionales y novedades desde la web publica.</li>
         </ul>
         <p className='text-xs text-emerald-900/80'>
-          Pacientes: primero DNI, luego autocompleta si existe o solicita datos para primer ingreso.
+          Importante: sin ingresar como paciente no podras confirmar una reserva de turno.
         </p>
       </Card>
     </div>
