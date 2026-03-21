@@ -123,7 +123,12 @@ export const runSeed = async () => {
       ])
     }
 
-    await upsertUser({ role: 'admin', email: 'admin@mail.com', password: 'admin', accountType: 'staff' })
+    await upsertUser({
+      role: 'admin',
+      email: 'prof.mcjuncos@gmail.com',
+      password: 'Cordoba2020',
+      accountType: 'staff'
+    })
     await upsertUser({ role: 'clinic', email: 'clinica@mail.com', password: 'clinica', accountType: 'staff' })
     await upsertUser({
       role: 'doctor',

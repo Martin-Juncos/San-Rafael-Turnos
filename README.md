@@ -130,7 +130,7 @@ Checklist rapida de inicio:
 
 ## Credenciales demo
 
-- Admin: `admin@mail.com / admin`
+- Admin: `prof.mcjuncos@gmail.com / Cordoba2020`
 - Clinica: `clinica@mail.com / clinica`
 - Medico: `medico@mail.com / 30111222`
 - Paciente: ingreso rapido desde pantalla de login con DNI y datos personales
@@ -194,7 +194,7 @@ npm run db:reset:demo
 Hace una limpieza completa de datos operativos y catalogos, y luego vuelve a ejecutar el seed minimo.
 
 Despues de `db:reset:demo`, te quedan de nuevo:
-- Admin: `admin@mail.com / admin`
+- Admin: `prof.mcjuncos@gmail.com / Cordoba2020`
 - Clinica: `clinica@mail.com / clinica`
 - Medico demo: `medico@mail.com / 30111222`
 - Especialidades, medico y obra social basicos del seed
