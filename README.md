@@ -212,6 +212,38 @@ Luego puedes volver a cargar el resto desde la aplicacion:
 - `npm run lint`
 - `npm run test`
 
+## Deploy en Render
+
+Este repo ya queda preparado como monorepo para Render mediante `render.yaml` en la raiz.
+
+Recursos previstos:
+- Base Postgres administrada: `san-rafael-turnos-db`
+- Web Service backend con `rootDir: backend`
+- Static Site frontend con `rootDir: frontend`
+
+Regla de trabajo recomendada:
+1. Conecta este repo en Render y sincroniza `render.yaml`.
+2. Revisa antes de crear recursos que el backend usa plan `starter` y la base usa `basic-256mb`.
+3. Completa manualmente en Render las variables marcadas como secretas o dependientes de dominio.
+4. Deja que el primer deploy del backend ejecute `npm run db:migrate`.
+5. Si quieres datos demo despues del primer deploy, ejecuta una vez `npm run seed` sobre el backend.
+
+Variables que debes completar en Render despues de conocer las URLs finales:
+- Backend:
+  - `CORS_ORIGIN=https://TU-FRONTEND.onrender.com`
+  - `FRONTEND_PUBLIC_URL=https://TU-FRONTEND.onrender.com`
+  - `MERCADOPAGO_WEBHOOK_URL=https://TU-BACKEND.onrender.com/api/payments/mercadopago/webhook`
+  - `MERCADOPAGO_ACCESS_TOKEN`
+  - `MERCADOPAGO_WEBHOOK_SECRET` si activas firma
+- Frontend:
+  - `VITE_API_URL=https://TU-BACKEND.onrender.com/api`
+  - `VITE_MERCADOPAGO_PUBLIC_KEY`
+
+Notas de deploy:
+- El frontend usa `BrowserRouter`, por eso el blueprint incluye rewrite de SPA hacia `/index.html`.
+- El backend corre un job interno de expiracion de holds; por eso el blueprint deja el backend como Web Service siempre activo y no como funcion serverless.
+- Render ignora cambios fuera del `rootDir` de cada servicio para autodeploys, asi que `docs/`, `.vscode/`, `.codex/` y otros archivos de soporte no bloquean este esquema.
+
 ## Seguridad
 
 - JWT access token de 15m.
@@ -224,5 +256,5 @@ Luego puedes volver a cargar el resto desde la aplicacion:
 ## Limites actuales
 
 - WhatsApp real no integrado, solo mock.
-- Produccion aun no configurada.
+- Produccion base preparada para Render, pero faltan completar secretos, dominios y claves reales de terceros.
 - En desarrollo, el webhook requiere `ngrok` o una URL publica equivalente.
