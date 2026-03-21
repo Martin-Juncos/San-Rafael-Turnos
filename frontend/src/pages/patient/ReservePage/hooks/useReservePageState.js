@@ -28,7 +28,7 @@ export function useReservePageState () {
   })
 
   const isPatientRole = auth.role === 'patient'
-  const isStaffBooking = ['admin', 'clinic', 'doctor'].includes(auth.role)
+  const isStaffBooking = ['admin', 'clinic', 'doctor', 'secretary'].includes(auth.role)
 
   const reserveForm = useReserveForm({
     auth,

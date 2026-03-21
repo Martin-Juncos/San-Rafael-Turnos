@@ -3,6 +3,7 @@ import { Appointment, Message } from '../db/models/index.js'
 import { AppError } from '../utils/errors.js'
 import { ok } from '../utils/response.js'
 import { config } from '../config/env.js'
+import { hasDoctorScopeAccess } from '../utils/doctorScope.js'
 
 export const appointmentMessagesSchema = z.object({
   body: z.object({}).optional(),
@@ -24,7 +25,7 @@ export const postMessageSchema = z.object({
 
 const ensureMessagePermission = (auth, appointment) => {
   if (auth.role === 'admin' || auth.role === 'clinic') return
-  if (auth.role === 'doctor' && auth.doctorId === appointment.doctorId) return
+  if (hasDoctorScopeAccess(auth, appointment.doctorId)) return
   if (auth.role === 'patient' && auth.patientId === appointment.patientId) return
   throw new AppError('Prohibido', 403, 'forbidden')
 }
@@ -44,6 +45,7 @@ const ensureMessagingWindow = (appointment) => {
 const senderRoleFromAuth = (role) => {
   if (role === 'doctor') return 'doctor'
   if (role === 'patient') return 'patient'
+  if (role === 'secretary') return 'clinic'
   return 'clinic'
 }
 

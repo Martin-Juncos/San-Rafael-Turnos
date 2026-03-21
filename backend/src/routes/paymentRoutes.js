@@ -42,7 +42,7 @@ router.get('/:appointmentId', authenticateJwt, validate(paymentByAppointmentSche
 router.patch(
   '/:appointmentId/status',
   authenticateJwt,
-  requireRoles('admin', 'clinic', 'doctor'),
+  requireRoles('admin', 'clinic', 'doctor', 'secretary'),
   validate(updatePaymentStatusSchema),
   asyncHandler(updatePaymentStatusByAppointment)
 )

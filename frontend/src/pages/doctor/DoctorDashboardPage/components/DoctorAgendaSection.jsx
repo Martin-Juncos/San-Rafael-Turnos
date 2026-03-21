@@ -2,6 +2,7 @@ import { Button } from '../../../../components/ui/Button'
 import { Card } from '../../../../components/ui/Card'
 
 export function DoctorAgendaSection ({
+  canOpenConsultRecord,
   selectedPrintDate,
   setSelectedPrintDate,
   printableDates,
@@ -66,13 +67,17 @@ export function DoctorAgendaSection ({
                 >
                   Gestionar
                 </button>
-                <button
-                  type='button'
-                  className='rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xs'
-                  onClick={() => openConsultRecord(appointment)}
-                >
-                  Registro de consulta
-                </button>
+                {canOpenConsultRecord
+                  ? (
+                    <button
+                      type='button'
+                      className='rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xs'
+                      onClick={() => openConsultRecord(appointment)}
+                    >
+                      Registro de consulta
+                    </button>
+                    )
+                  : null}
               </div>
             </div>
             <div className='mt-2 flex flex-wrap gap-2'>

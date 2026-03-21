@@ -4,7 +4,9 @@ import { APPOINTMENT_STATUS_LABELS } from '../doctorDashboardUtils'
 
 export function useDoctorActions ({
   navigate,
-  auth,
+  activeDoctorId,
+  canOpenPatientRecords,
+  canOpenConsultRecord,
   doctorSpecialtyId,
   selectedPrintDate,
   appointments,
@@ -114,7 +116,7 @@ export function useDoctorActions ({
   }
 
   const openReserveWithPrefill = () => {
-    const doctorId = auth.user?.doctorId
+    const doctorId = activeDoctorId
     if (!doctorId) return
 
     const params = new URLSearchParams()
@@ -127,10 +129,12 @@ export function useDoctorActions ({
   }
 
   const openPatientRecords = () => {
+    if (!canOpenPatientRecords) return
     navigate('/dashboard/medico/registros-pacientes')
   }
 
   const openConsultRecord = (appointment) => {
+    if (!canOpenConsultRecord) return
     if (!appointment?.id) return
 
     if (appointment.status === 'cancelled') {

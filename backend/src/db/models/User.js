@@ -11,7 +11,7 @@ export const initUserModel = (sequelize) => {
         primaryKey: true
       },
       role: {
-        type: DataTypes.ENUM('admin', 'clinic', 'doctor'),
+        type: DataTypes.ENUM('admin', 'clinic', 'doctor', 'secretary'),
         allowNull: false
       },
       accountType: {

@@ -1,4 +1,5 @@
 import { AppError } from '../utils/errors.js'
+import { hasDoctorScopeAccess } from '../utils/doctorScope.js'
 
 const resolvePath = (source, path) => {
   return String(path)
@@ -23,7 +24,7 @@ export const requireOwnership = ({ ownerType, path }) => (req, _res, next) => {
   }
 
   if (ownerType === 'doctor') {
-    if (role === 'doctor' && req.auth?.doctorId === targetOwnerId) {
+    if (hasDoctorScopeAccess(req.auth, targetOwnerId)) {
       return next()
     }
     return next(new AppError('Prohibido', 403, 'forbidden'))

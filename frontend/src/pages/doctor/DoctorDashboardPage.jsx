@@ -11,7 +11,11 @@ export function DoctorDashboardPage () {
   return (
     <div className='space-y-6'>
       <DoctorDashboardHeader
-        doctorId={doctor.auth.user?.doctorId}
+        doctorId={doctor.activeDoctorId}
+        isSecretary={doctor.isSecretary}
+        activeDoctorId={doctor.activeDoctorId}
+        doctorScopes={doctor.doctorScopes}
+        onDoctorContextChange={doctor.setActiveDoctor}
         onOpenPatientRecords={doctor.openPatientRecords}
         onOpenReserveWithPrefill={doctor.openReserveWithPrefill}
       />
@@ -24,6 +28,7 @@ export function DoctorDashboardPage () {
 
       <div className='grid gap-6 xl:grid-cols-[1.2fr_1fr]'>
         <DoctorAgendaSection
+          canOpenConsultRecord={!doctor.isSecretary}
           selectedPrintDate={doctor.selectedPrintDate}
           setSelectedPrintDate={doctor.setSelectedPrintDate}
           printableDates={doctor.printableDates}
@@ -39,6 +44,7 @@ export function DoctorDashboardPage () {
         />
 
         <DoctorManagementPanel
+          canEditDoctorNotes={!doctor.isSecretary}
           selectedAppointmentId={doctor.selectedAppointmentId}
           appointments={doctor.appointments}
           unreadAppointmentIds={doctor.unreadAppointmentIds}

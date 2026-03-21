@@ -59,7 +59,7 @@ export function AppRoutes () {
         <Route
           path='/reservar'
           element={
-            <GuardedRoute allowedRoles={['admin', 'clinic', 'doctor', 'patient']}>
+            <GuardedRoute allowedRoles={['admin', 'clinic', 'doctor', 'secretary', 'patient']}>
               <ReservePage />
             </GuardedRoute>
           }
@@ -83,7 +83,7 @@ export function AppRoutes () {
         <Route
           path='/dashboard/medico'
           element={
-            <GuardedRoute allowedRoles={['doctor']}>
+            <GuardedRoute allowedRoles={['doctor', 'secretary']}>
               <DoctorDashboardPage />
             </GuardedRoute>
           }
@@ -91,7 +91,7 @@ export function AppRoutes () {
         <Route
           path='/dashboard/medico/imprimir'
           element={
-            <GuardedRoute allowedRoles={['doctor']}>
+            <GuardedRoute allowedRoles={['doctor', 'secretary']}>
               <DoctorPrintDayPage />
             </GuardedRoute>
           }
@@ -135,4 +135,3 @@ export function AppRoutes () {
     </Suspense>
   )
 }
-

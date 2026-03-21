@@ -16,6 +16,7 @@ const rolePath = {
   admin: '/dashboard/admin',
   clinic: '/dashboard/clinica',
   doctor: '/dashboard/medico',
+  secretary: '/dashboard/medico',
   patient: '/dashboard/paciente'
 }
 

@@ -6,6 +6,7 @@ import { initHealthInsuranceModel, HealthInsurance } from './HealthInsurance.js'
 import { initDoctorModel, Doctor } from './Doctor.js'
 import { initDoctorAvailabilityModel, DoctorAvailability } from './DoctorAvailability.js'
 import { initDoctorBlockModel, DoctorBlock } from './DoctorBlock.js'
+import { initSecretaryDoctorModel, SecretaryDoctor } from './SecretaryDoctor.js'
 import { initPatientModel, Patient } from './Patient.js'
 import { initAppointmentModel, Appointment } from './Appointment.js'
 import { initPaymentModel, Payment } from './Payment.js'
@@ -28,6 +29,7 @@ export const initModels = () => {
   initDoctorModel(sequelize)
   initDoctorAvailabilityModel(sequelize)
   initDoctorBlockModel(sequelize)
+  initSecretaryDoctorModel(sequelize)
   initPatientModel(sequelize)
   initAppointmentModel(sequelize)
   initPaymentModel(sequelize)
@@ -102,6 +104,19 @@ export const initModels = () => {
   User.belongsTo(Doctor, { foreignKey: 'doctorId', as: 'doctor' })
   Doctor.hasOne(User, { foreignKey: 'doctorId', as: 'user' })
 
+  User.belongsToMany(Doctor, {
+    through: SecretaryDoctor,
+    foreignKey: 'secretaryUserId',
+    otherKey: 'doctorId',
+    as: 'linkedDoctors'
+  })
+  Doctor.belongsToMany(User, {
+    through: SecretaryDoctor,
+    foreignKey: 'doctorId',
+    otherKey: 'secretaryUserId',
+    as: 'secretaries'
+  })
+
   User.hasMany(RefreshToken, { foreignKey: 'userId', as: 'refreshTokens' })
   RefreshToken.belongsTo(User, { foreignKey: 'userId', as: 'user' })
 
@@ -119,6 +134,7 @@ export {
   Doctor,
   DoctorAvailability,
   DoctorBlock,
+  SecretaryDoctor,
   Patient,
   Appointment,
   Payment,

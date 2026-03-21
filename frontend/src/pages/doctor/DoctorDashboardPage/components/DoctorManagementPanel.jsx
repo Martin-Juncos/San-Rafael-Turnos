@@ -3,6 +3,7 @@ import { Input } from '../../../../components/ui/Input'
 import { Card } from '../../../../components/ui/Card'
 
 export function DoctorManagementPanel ({
+  canEditDoctorNotes,
   selectedAppointmentId,
   appointments,
   unreadAppointmentIds,
@@ -88,11 +89,15 @@ export function DoctorManagementPanel ({
               </label>
             </div>
 
-            <Input
-              label='Nota interna'
-              value={managementForm.doctorNotes}
-              onChange={(event) => setManagementForm((prev) => ({ ...prev, doctorNotes: event.target.value }))}
-            />
+            {canEditDoctorNotes
+              ? (
+                <Input
+                  label='Nota interna'
+                  value={managementForm.doctorNotes}
+                  onChange={(event) => setManagementForm((prev) => ({ ...prev, doctorNotes: event.target.value }))}
+                />
+                )
+              : null}
 
             <Button onClick={saveManagement} disabled={savingManagement}>
               {savingManagement ? 'Guardando cambios...' : 'Guardar gestion'}

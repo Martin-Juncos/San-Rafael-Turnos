@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAppSelector } from '../../../../app/hooks'
-import { selectAuth } from '../../../../features/auth/authSlice'
+import { useAppDispatch, useAppSelector } from '../../../../app/hooks'
+import {
+  selectAuth,
+  setActiveDoctorContext
+} from '../../../../features/auth/authSlice'
 import { useDoctorSpecialty } from '../../../../hooks/useDoctorSpecialty'
 import {
   APPOINTMENT_STATUS_OPTIONS,
@@ -16,8 +19,12 @@ import { useDoctorMessages } from './useDoctorMessages'
 
 export function useDoctorDashboardState () {
   const navigate = useNavigate()
+  const dispatch = useAppDispatch()
   const auth = useAppSelector(selectAuth)
-  const doctorSpecialtyId = useDoctorSpecialty(auth.role === 'doctor' ? auth.user?.doctorId : '')
+  const isSecretary = auth.role === 'secretary'
+  const activeDoctorId = ['doctor', 'secretary'].includes(auth.role) ? auth.activeDoctorId : ''
+  const doctorScopes = Array.isArray(auth.user?.doctorScopes) ? auth.user.doctorScopes : []
+  const doctorSpecialtyId = useDoctorSpecialty(activeDoctorId)
 
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -32,6 +39,7 @@ export function useDoctorDashboardState () {
   const syncManagementForm = filters.syncManagementForm
 
   const agenda = useDoctorAgenda({
+    activeDoctorId,
     selectedAppointmentId: filters.selectedAppointmentId,
     setSelectedAppointmentId: filters.setSelectedAppointmentId,
     setSelectedPrintDate: filters.setSelectedPrintDate,
@@ -79,7 +87,9 @@ export function useDoctorDashboardState () {
 
   const actions = useDoctorActions({
     navigate,
-    auth,
+    activeDoctorId,
+    canOpenPatientRecords: !isSecretary,
+    canOpenConsultRecord: !isSecretary,
     doctorSpecialtyId,
     selectedPrintDate: filters.selectedPrintDate,
     appointments: agenda.appointments,
@@ -96,6 +106,12 @@ export function useDoctorDashboardState () {
     doctorMessages.markConversationRead(appointmentId)
   }
 
+  const setActiveDoctor = (doctorId) => {
+    dispatch(setActiveDoctorContext(doctorId))
+    filters.setSelectedAppointmentId('')
+    filters.setSelectedPrintDate('')
+  }
+
   const handleOpenIncomingAlert = () => {
     if (!doctorMessages.incomingAlert?.appointmentId) return
     handleSelectAppointment(doctorMessages.incomingAlert.appointmentId)
@@ -104,6 +120,10 @@ export function useDoctorDashboardState () {
 
   return {
     auth,
+    isSecretary,
+    activeDoctorId,
+    doctorScopes,
+    setActiveDoctor,
     error,
     message,
     feedbackModal,

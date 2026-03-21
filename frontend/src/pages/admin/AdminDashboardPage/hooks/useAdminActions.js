@@ -109,7 +109,7 @@ export function useAdminActions ({
       fullName: secretaryName,
       email: secretaryEmail,
       phone: secretaryForm.phone.trim(),
-      doctorId: secretaryForm.doctorId
+      doctorIds: secretaryForm.doctorIds
     }
     if (secretaryForm.dni) {
       payload.dni = secretaryForm.dni.replace(/\D/g, '')
@@ -233,7 +233,9 @@ export function useAdminActions ({
       email: secretary.email || '',
       phone: secretary.phone || '',
       dni: secretary.dni || '',
-      doctorId: secretary.doctorId || ''
+      doctorIds: Array.isArray(secretary.linkedDoctors)
+        ? secretary.linkedDoctors.map((doctor) => doctor.id)
+        : []
     })
   }, [setEditingSecretaryId, setSecretaryForm])
 
@@ -384,4 +386,3 @@ export function useAdminActions ({
     saveAvailability
   }
 }
-

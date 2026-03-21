@@ -28,6 +28,7 @@ import {
   appointmentDefaultInclude,
   findAppointmentById
 } from '../repositories/appointmentRepository.js'
+import { hasDoctorScopeAccess } from '../utils/doctorScope.js'
 
 const createAppointmentBodySchema = z.object({
   doctorId: z.string().uuid(),
@@ -126,7 +127,7 @@ const ensureAppointmentPermission = (auth, appointment) => {
   if (auth.role === 'admin' || auth.role === 'clinic') {
     return
   }
-  if (auth.role === 'doctor' && auth.doctorId === appointment.doctorId) {
+  if (hasDoctorScopeAccess(auth, appointment.doctorId)) {
     return
   }
   if (auth.role === 'patient' && auth.patientId === appointment.patientId) {
@@ -163,7 +164,7 @@ export const listMyAppointments = async (req, res) => {
 }
 
 export const listAppointments = async (req, res) => {
-  if (!['clinic', 'admin', 'doctor'].includes(req.auth.role)) {
+  if (!['clinic', 'admin', 'doctor', 'secretary'].includes(req.auth.role)) {
     throw new AppError('Prohibido', 403, 'forbidden')
   }
   const { query = {} } = req.validated
@@ -191,7 +192,7 @@ const applyPatchByRole = ({ role, body }) => {
   if (role === 'admin' || role === 'clinic') {
     return body
   }
-  if (role === 'doctor') {
+  if (role === 'doctor' || role === 'secretary') {
     const allowed = {}
     if (body.date) {
       allowed.date = body.date
@@ -208,7 +209,7 @@ const applyPatchByRole = ({ role, body }) => {
     if (typeof body.symptoms === 'string') {
       allowed.symptoms = body.symptoms
     }
-    if (typeof body.doctorNotes === 'string') {
+    if (role === 'doctor' && typeof body.doctorNotes === 'string') {
       allowed.doctorNotes = body.doctorNotes
     }
     if (body.cancelReason) {

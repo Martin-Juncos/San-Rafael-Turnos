@@ -3,6 +3,7 @@ import {
   clearStoredAuthState,
   getStoredAccessToken,
   loadStoredAuthState,
+  resolveStoredActiveDoctorId,
   updateStoredAuthState
 } from '../../features/auth/sessionManager'
 import { ApiError, isRetryableApiError, toApiError } from './error'
@@ -70,7 +71,11 @@ const updateAuthWithRefresh = ({ accessToken, refreshToken, user }) => {
       token: accessToken,
       refreshToken: refreshToken ?? stored.refreshToken,
       user: user ?? stored.user,
-      role: user?.role ?? stored.role
+      role: user?.role ?? stored.role,
+      activeDoctorId: resolveStoredActiveDoctorId({
+        stored,
+        user: user ?? stored.user
+      })
     }
   })
 }
@@ -84,6 +89,7 @@ const updateAuthWithPatientLogin = ({ token, patient }) => {
       refreshToken: null,
       user: null,
       role: 'patient',
+      activeDoctorId: null,
       patient: patient ?? stored.patient
     }
   })
@@ -194,8 +200,18 @@ const retryFailedRequest = async (error) => {
 
 httpClient.interceptors.request.use((request) => {
   const token = getStoredAccessToken()
+  const stored = loadStoredAuthState()
   if (token) {
     request.headers.Authorization = `Bearer ${token}`
+  }
+  if (stored?.role === 'secretary') {
+    const activeDoctorId = resolveStoredActiveDoctorId({
+      stored,
+      user: stored.user
+    })
+    if (activeDoctorId) {
+      request.headers['x-doctor-context'] = activeDoctorId
+    }
   }
   return request
 })

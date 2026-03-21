@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { appointmentsService } from '../../../../api/services'
 
 export function useDoctorAgenda ({
+  activeDoctorId,
   selectedAppointmentId,
   setSelectedAppointmentId,
   setSelectedPrintDate,
@@ -22,9 +23,13 @@ export function useDoctorAgenda ({
   }, [appointments])
 
   const loadAppointments = useCallback(async () => {
+    if (!activeDoctorId) {
+      setAppointments([])
+      return
+    }
     const data = await appointmentsService.list({ pageSize: 50 })
     setAppointments(data.items)
-  }, [])
+  }, [activeDoctorId])
 
   useEffect(() => {
     loadAppointments().catch((apiError) => setError(apiError.message))

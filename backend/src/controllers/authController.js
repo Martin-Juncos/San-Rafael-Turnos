@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs'
 import { Op } from 'sequelize'
 import { z } from 'zod'
 import { config } from '../config/env.js'
-import { User, RefreshToken, sequelize } from '../db/models/index.js'
+import { User, RefreshToken, Doctor, sequelize } from '../db/models/index.js'
 import { AppError } from '../utils/errors.js'
 import { createRefreshToken, hashRefreshToken, signAccessToken } from '../utils/jwt.js'
 import { ok } from '../utils/response.js'
@@ -27,19 +27,49 @@ export const refreshSchema = z.object({
 
 export const logoutSchema = refreshSchema
 
-const sanitizeUser = (user) => ({
-  id: user.id,
-  role: user.role,
-  accountType: user.accountType,
-  email: user.email,
-  fullName: user.fullName,
-  phone: user.phone,
-  dni: user.dni,
-  doctorId: user.doctorId,
-  isActive: user.isActive
+const doctorScopeAttributes = ['id', 'fullName', 'specialtyId', 'consultorio', 'isActive']
+
+const serializeDoctorScope = (doctor) => ({
+  id: doctor.id,
+  fullName: doctor.fullName,
+  specialtyId: doctor.specialtyId,
+  consultorio: doctor.consultorio,
+  isActive: doctor.isActive
 })
 
-const ensureDoctorLinked = (user) => {
+const buildDoctorScopes = (user) => {
+  if (user.role === 'doctor') {
+    return user.doctor ? [serializeDoctorScope(user.doctor)] : []
+  }
+
+  if (user.role === 'secretary') {
+    return Array.isArray(user.linkedDoctors)
+      ? user.linkedDoctors.map(serializeDoctorScope)
+      : []
+  }
+
+  return []
+}
+
+const sanitizeUser = (user) => {
+  const doctorScopes = buildDoctorScopes(user)
+
+  return {
+    id: user.id,
+    role: user.role,
+    accountType: user.accountType,
+    email: user.email,
+    fullName: user.fullName,
+    phone: user.phone,
+    dni: user.dni,
+    doctorId: user.doctorId,
+    doctorScopes,
+    activeDoctorId: doctorScopes[0]?.id ?? user.doctorId ?? null,
+    isActive: user.isActive
+  }
+}
+
+const ensureMedicalContextLinked = (user) => {
   if (user.role === 'doctor' && !user.doctorId) {
     throw new AppError(
       'El usuario medico no esta vinculado a un perfil de medico. Contacte al administrador.',
@@ -47,13 +77,38 @@ const ensureDoctorLinked = (user) => {
       'doctor_profile_not_linked'
     )
   }
+  if (user.role === 'secretary' && buildDoctorScopes(user).length === 0) {
+    throw new AppError(
+      'La secretaria no tiene medicos vinculados. Contacte al administrador.',
+      403,
+      'secretary_doctors_not_linked'
+    )
+  }
 }
 
+const sessionUserInclude = [
+  {
+    model: Doctor,
+    as: 'doctor',
+    attributes: doctorScopeAttributes
+  },
+  {
+    model: Doctor,
+    as: 'linkedDoctors',
+    attributes: doctorScopeAttributes,
+    through: { attributes: [] },
+    required: false
+  }
+]
+
 const buildTokensForUser = async ({ user, oldRefreshToken, ip, userAgent, transaction }) => {
+  const doctorScopes = buildDoctorScopes(user)
+
   const accessToken = signAccessToken({
     sub: user.id,
     role: user.role,
-    doctorId: user.doctorId ?? null
+    doctorId: user.doctorId ?? null,
+    doctorIds: doctorScopes.map((item) => item.id)
   })
 
   const { plainToken, tokenHash } = createRefreshToken()
@@ -84,7 +139,10 @@ const buildTokensForUser = async ({ user, oldRefreshToken, ip, userAgent, transa
 
 export const login = async (req, res) => {
   const { email, password } = req.validated.body
-  const user = await User.findOne({ where: { email, isActive: true } })
+  const user = await User.findOne({
+    where: { email, isActive: true },
+    include: sessionUserInclude
+  })
 
   if (!user) {
     throw new AppError('Credenciales invalidas', 401, 'invalid_credentials')
@@ -94,7 +152,7 @@ export const login = async (req, res) => {
   if (!match) {
     throw new AppError('Credenciales invalidas', 401, 'invalid_credentials')
   }
-  ensureDoctorLinked(user)
+  ensureMedicalContextLinked(user)
 
   const tokens = await sequelize.transaction(async (transaction) => {
     return buildTokensForUser({
@@ -126,13 +184,17 @@ export const refresh = async (req, res) => {
       revokedAt: null,
       expiresAt: { [Op.gt]: new Date() }
     },
-    include: [{ model: User, as: 'user' }]
+    include: [{
+      model: User,
+      as: 'user',
+      include: sessionUserInclude
+    }]
   })
 
   if (!current || !current.user || !current.user.isActive) {
     throw new AppError('Refresh token invalido', 401, 'invalid_refresh_token')
   }
-  ensureDoctorLinked(current.user)
+  ensureMedicalContextLinked(current.user)
 
   const tokens = await sequelize.transaction(async (transaction) => {
     return buildTokensForUser({

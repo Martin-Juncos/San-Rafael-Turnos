@@ -12,7 +12,7 @@ BEGIN
     WHERE t.typname = 'enum_User_role'
       AND n.nspname = current_schema()
   ) THEN
-    CREATE TYPE "enum_User_role" AS ENUM ('admin', 'clinic', 'doctor');
+    CREATE TYPE "enum_User_role" AS ENUM ('admin', 'clinic', 'doctor', 'secretary');
   END IF;
 END
 $$;
@@ -250,6 +250,25 @@ CREATE TABLE IF NOT EXISTS "RefreshToken" (
     ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS "SecretaryDoctor" (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  "secretaryUserId" UUID NOT NULL,
+  "doctorId" UUID NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT secretarydoctor_secretary_user_id_fk_base
+    FOREIGN KEY ("secretaryUserId")
+    REFERENCES "User"(id)
+    ON UPDATE CASCADE
+    ON DELETE CASCADE,
+  CONSTRAINT secretarydoctor_doctor_id_fk_base
+    FOREIGN KEY ("doctorId")
+    REFERENCES "Doctor"(id)
+    ON UPDATE CASCADE
+    ON DELETE CASCADE,
+  CONSTRAINT secretarydoctor_secretary_doctor_uq UNIQUE ("secretaryUserId", "doctorId")
+);
+
 CREATE TABLE IF NOT EXISTS "DoctorAvailability" (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   "doctorId" UUID NOT NULL,
@@ -442,6 +461,9 @@ CREATE INDEX IF NOT EXISTS refreshtoken_user_id_idx
 
 CREATE INDEX IF NOT EXISTS refreshtoken_expires_at_idx
   ON "RefreshToken" ("expiresAt");
+
+CREATE INDEX IF NOT EXISTS secretarydoctor_doctor_id_idx
+  ON "SecretaryDoctor" ("doctorId");
 
 CREATE INDEX IF NOT EXISTS doctor_specialty_active_idx
   ON "Doctor" ("specialtyId")

@@ -18,7 +18,7 @@ const buildReservePath = ({ doctorId, specialtyId }) => {
 
 export function useReserveLink () {
   const auth = useAppSelector(selectAuth)
-  const doctorId = auth.role === 'doctor' ? auth.user?.doctorId : ''
+  const doctorId = ['doctor', 'secretary'].includes(auth.role) ? auth.activeDoctorId : ''
   const specialtyId = useDoctorSpecialty(doctorId)
 
   return useMemo(

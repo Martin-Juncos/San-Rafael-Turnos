@@ -5,6 +5,7 @@ DROP TABLE IF EXISTS "Payment";
 DROP TABLE IF EXISTS "Appointment";
 DROP TABLE IF EXISTS "DoctorBlock";
 DROP TABLE IF EXISTS "DoctorAvailability";
+DROP TABLE IF EXISTS "SecretaryDoctor";
 DROP TABLE IF EXISTS "RefreshToken";
 DROP TABLE IF EXISTS "PatientOtp";
 DROP TABLE IF EXISTS "AuditLog";

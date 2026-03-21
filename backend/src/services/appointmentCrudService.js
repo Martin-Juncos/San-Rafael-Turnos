@@ -19,6 +19,7 @@ import {
   findOrCreatePatientByDni,
   findSpecialtyById
 } from '../repositories/appointmentRepository.js'
+import { hasPrivilegedRole } from '../utils/doctorScope.js'
 
 const defaultDependencies = {
   sequelize,
@@ -52,7 +53,7 @@ const normalizePatientPayload = ({ fullName, dni, phone, streetAndNumber, city }
 }
 
 const assertCanCreateAppointment = ({ actorRole }) => {
-  if (!['patient', 'clinic', 'admin', 'doctor'].includes(actorRole)) {
+  if (!['patient', 'clinic', 'admin', 'doctor', 'secretary'].includes(actorRole)) {
     throw new AppError('Prohibido', 403, 'forbidden')
   }
 }
@@ -235,10 +236,14 @@ export const listScopedAppointments = async ({ auth, query = {} }) => {
   const { page, pageSize, offset, limit } = parsePagination(query)
 
   const where = {}
-  if (auth.role === 'doctor') {
-    where.doctorId = auth.doctorId
+  if (auth.role === 'doctor' || auth.role === 'secretary') {
+    if (!auth.effectiveDoctorId) {
+      throw new AppError('Debe seleccionar un medico activo', 400, 'doctor_context_required')
+    }
+    where.doctorId = auth.effectiveDoctorId
   }
-  if (query.doctorId && auth.role !== 'doctor') where.doctorId = query.doctorId
+  if (query.doctorId && !hasPrivilegedRole(auth.role)) where.doctorId = where.doctorId || query.doctorId
+  if (query.doctorId && hasPrivilegedRole(auth.role)) where.doctorId = query.doctorId
   if (query.specialtyId) where.specialtyId = query.specialtyId
   if (query.status) where.status = query.status
   if (query.dateFrom || query.dateTo) {

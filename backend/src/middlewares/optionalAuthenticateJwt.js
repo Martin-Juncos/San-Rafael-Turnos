@@ -1,4 +1,5 @@
 import { verifyAccessToken } from '../utils/jwt.js'
+import { attachEffectiveDoctorId } from '../utils/doctorScope.js'
 
 export const optionalAuthenticateJwt = (req, _res, next) => {
   const authHeader = req.headers.authorization
@@ -9,6 +10,7 @@ export const optionalAuthenticateJwt = (req, _res, next) => {
   try {
     const token = authHeader.slice('Bearer '.length).trim()
     req.auth = verifyAccessToken(token)
+    attachEffectiveDoctorId(req)
   } catch (_error) {
     req.auth = undefined
   }

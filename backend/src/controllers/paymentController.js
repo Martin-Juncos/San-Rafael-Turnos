@@ -19,6 +19,7 @@ import {
   syncMercadoPagoPaymentLocally
 } from '../services/mercadoPagoReconciliationService.js'
 import { validateMercadoPagoWebhookSignature } from '../services/mercadoPagoWebhookSecurityService.js'
+import { hasDoctorScopeAccess } from '../utils/doctorScope.js'
 
 const appointmentWithPaymentInclude = [
   { model: Payment, as: 'payment' },
@@ -97,7 +98,7 @@ export const updatePaymentStatusSchema = z.object({
 
 const ensurePaymentReadPermission = (auth, appointment) => {
   if (auth.role === 'admin' || auth.role === 'clinic') return
-  if (auth.role === 'doctor' && auth.doctorId === appointment.doctorId) return
+  if (hasDoctorScopeAccess(auth, appointment.doctorId)) return
   if (auth.role === 'patient' && auth.patientId === appointment.patientId) return
   throw new AppError('Prohibido', 403, 'forbidden')
 }
@@ -410,7 +411,7 @@ export const getPaymentByAppointment = async (req, res) => {
 }
 
 export const updatePaymentStatusByAppointment = async (req, res) => {
-  if (!['admin', 'clinic', 'doctor'].includes(req.auth.role)) {
+  if (!['admin', 'clinic', 'doctor', 'secretary'].includes(req.auth.role)) {
     throw new AppError('Prohibido', 403, 'forbidden')
   }
 

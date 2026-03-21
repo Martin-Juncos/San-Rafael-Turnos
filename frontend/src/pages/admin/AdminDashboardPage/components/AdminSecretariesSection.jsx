@@ -14,12 +14,24 @@ export function AdminSecretariesSection ({
   handleEditSecretary,
   handleDeleteSecretary
 }) {
+  const toggleDoctor = (doctorId) => {
+    setSecretaryForm((prev) => {
+      const current = Array.isArray(prev.doctorIds) ? prev.doctorIds : []
+      return {
+        ...prev,
+        doctorIds: current.includes(doctorId)
+          ? current.filter((item) => item !== doctorId)
+          : [...current, doctorId]
+      }
+    })
+  }
+
   return (
     <Card className='space-y-4'>
       <div className='space-y-1'>
         <h2 className='text-lg font-semibold text-emerald-950'>Secretaria</h2>
         <p className='text-xs text-emerald-900/70'>
-          {editingSecretaryId ? 'Editando secretaria seleccionada.' : 'Asigna secretarias por medico.'}
+          {editingSecretaryId ? 'Editando secretaria seleccionada.' : 'Asigna secretarias a uno o varios medicos.'}
         </p>
       </div>
       <form className='grid gap-2 sm:grid-cols-2' onSubmit={handleSubmitSecretary}>
@@ -44,19 +56,25 @@ export function AdminSecretariesSection ({
           value={secretaryForm.dni}
           onChange={(event) => setSecretaryForm((prev) => ({ ...prev, dni: event.target.value.replace(/\D/g, '') }))}
         />
-        <label className='space-y-1 sm:col-span-2'>
-          <span className='text-xs text-emerald-900/75'>Medico vinculado</span>
-          <select
-            className='glass-input'
-            value={secretaryForm.doctorId}
-            onChange={(event) => setSecretaryForm((prev) => ({ ...prev, doctorId: event.target.value }))}
-          >
-            <option value=''>Seleccionar</option>
-            {doctors.map((doctor) => (
-              <option key={doctor.id} value={doctor.id}>{doctor.fullName}</option>
-            ))}
-          </select>
-        </label>
+        <div className='space-y-2 sm:col-span-2'>
+          <span className='text-xs text-emerald-900/75'>Medicos vinculados</span>
+          <div className='grid gap-2 rounded-xl border border-emerald-200/70 bg-white/70 p-3 sm:grid-cols-2'>
+            {doctors.map((doctor) => {
+              const checked = secretaryForm.doctorIds.includes(doctor.id)
+              return (
+                <label key={doctor.id} className='flex items-center gap-2 text-sm text-emerald-950'>
+                  <input
+                    type='checkbox'
+                    checked={checked}
+                    onChange={() => toggleDoctor(doctor.id)}
+                  />
+                  <span>{doctor.fullName}</span>
+                </label>
+              )
+            })}
+            {doctors.length === 0 ? <p className='text-sm text-emerald-900/70'>No hay medicos cargados.</p> : null}
+          </div>
+        </div>
         <div className='sm:col-span-2 flex flex-wrap gap-2'>
           <Button type='submit'>
             {editingSecretaryId ? 'Guardar cambios' : 'Crear secretaria'}
@@ -79,7 +97,11 @@ export function AdminSecretariesSection ({
               <p className='text-xs text-emerald-900/70'>{secretary.email}</p>
               <p className='text-xs text-emerald-900/70'>Telefono: {secretary.phone || '-'}</p>
               <p className='text-xs text-emerald-900/70'>DNI: {secretary.dni || '-'}</p>
-              <p className='text-xs text-emerald-900/70'>Medico: {secretary.doctor?.fullName || '-'}</p>
+              <p className='text-xs text-emerald-900/70'>
+                Medicos: {Array.isArray(secretary.linkedDoctors) && secretary.linkedDoctors.length > 0
+                  ? secretary.linkedDoctors.map((doctor) => doctor.fullName).join(', ')
+                  : '-'}
+              </p>
             </div>
             <div className='flex items-center gap-1.5'>
               <Button
@@ -108,4 +130,3 @@ export function AdminSecretariesSection ({
     </Card>
   )
 }
-

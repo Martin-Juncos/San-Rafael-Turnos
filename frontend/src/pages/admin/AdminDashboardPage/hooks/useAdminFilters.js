@@ -25,7 +25,7 @@ const initialSecretaryForm = {
   email: '',
   phone: '',
   dni: '',
-  doctorId: ''
+  doctorIds: []
 }
 
 const initialAvailabilityForm = {
@@ -110,4 +110,3 @@ export function useAdminFilters () {
     resetAvailabilityForm
   }
 }
-

@@ -291,7 +291,7 @@ export function useReserveSubmit ({
     setError('')
     setSuccess('')
 
-    if (!['patient', 'clinic', 'admin', 'doctor'].includes(auth.role)) {
+    if (!['patient', 'clinic', 'admin', 'doctor', 'secretary'].includes(auth.role)) {
       setError('Debes iniciar sesion para cargar un turno.')
       return
     }

@@ -43,10 +43,46 @@ const normalizeStoredState = (state) => {
     refreshToken: state.refreshToken || null,
     user: state.user || null,
     patient: state.patient || null,
-    role: state.role || null
+    role: state.role || null,
+    activeDoctorId: state.activeDoctorId || null
   }
 
   return normalized.token ? normalized : null
+}
+
+const getDoctorScopeIds = (user) => {
+  if (!user) return []
+  if (user.role === 'doctor') {
+    return user.doctorId ? [user.doctorId] : []
+  }
+  if (user.role === 'secretary') {
+    return Array.isArray(user.doctorScopes)
+      ? user.doctorScopes.map((item) => item.id).filter(Boolean)
+      : []
+  }
+  return []
+}
+
+export const resolveStoredActiveDoctorId = ({ stored, user }) => {
+  const scopeIds = getDoctorScopeIds(user)
+
+  if (scopeIds.length === 0) {
+    return null
+  }
+
+  if (user?.role === 'doctor') {
+    return scopeIds[0]
+  }
+
+  if (stored?.activeDoctorId && scopeIds.includes(stored.activeDoctorId)) {
+    return stored.activeDoctorId
+  }
+
+  if (user?.activeDoctorId && scopeIds.includes(user.activeDoctorId)) {
+    return user.activeDoctorId
+  }
+
+  return scopeIds[0]
 }
 
 export const loadStoredAuthState = () => {
@@ -103,4 +139,3 @@ export const clearStoredAuthState = () => {
   window.localStorage.removeItem(AUTH_STATE_KEY)
   window.localStorage.removeItem(LEGACY_TOKEN_KEY)
 }
-

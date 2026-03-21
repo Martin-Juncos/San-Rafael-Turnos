@@ -1,5 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit'
 import { clearAuthState, loadAuthState, saveAuthState } from './authStorage'
+import { resolveStoredActiveDoctorId } from './sessionManager'
 
 const stored = loadAuthState()
 
@@ -9,6 +10,7 @@ const initialState = {
   user: stored?.user ?? null,
   patient: stored?.patient ?? null,
   role: stored?.role ?? null,
+  activeDoctorId: stored?.activeDoctorId ?? null,
   status: 'idle',
   error: null
 }
@@ -34,12 +36,17 @@ const authSlice = createSlice({
       state.user = user
       state.patient = null
       state.role = user.role
+      state.activeDoctorId = resolveStoredActiveDoctorId({
+        stored: state,
+        user
+      })
       saveAuthState({
         token: state.token,
         refreshToken: state.refreshToken,
         user: state.user,
         patient: state.patient,
-        role: state.role
+        role: state.role,
+        activeDoctorId: state.activeDoctorId
       })
     },
     setPatientSession: (state, action) => {
@@ -51,12 +58,25 @@ const authSlice = createSlice({
       state.user = null
       state.patient = patient
       state.role = 'patient'
+      state.activeDoctorId = null
       saveAuthState({
         token: state.token,
         refreshToken: null,
         user: null,
         patient: state.patient,
-        role: state.role
+        role: state.role,
+        activeDoctorId: null
+      })
+    },
+    setActiveDoctorContext: (state, action) => {
+      state.activeDoctorId = action.payload || null
+      saveAuthState({
+        token: state.token,
+        refreshToken: state.refreshToken,
+        user: state.user,
+        patient: state.patient,
+        role: state.role,
+        activeDoctorId: state.activeDoctorId
       })
     },
     clearSession: (state) => {
@@ -67,15 +87,17 @@ const authSlice = createSlice({
       state.user = null
       state.patient = null
       state.role = null
+      state.activeDoctorId = null
       clearAuthState()
     }
   }
 })
 
-export const { setLoading, setError, setStaffSession, setPatientSession, clearSession } = authSlice.actions
+export const { setLoading, setError, setStaffSession, setPatientSession, setActiveDoctorContext, clearSession } = authSlice.actions
 
 export const authReducer = authSlice.reducer
 
 export const selectAuth = (state) => state.auth
 export const selectRole = (state) => state.auth.role
 export const selectIsAuthenticated = (state) => Boolean(state.auth.token)
+export const selectActiveDoctorId = (state) => state.auth.activeDoctorId

@@ -46,3 +46,20 @@ test('Ownership doctor-self: permite doctor dueño, rechaza doctor externo y per
   })
   assert.equal(admin, null)
 })
+
+test('Ownership secretary-scope: permite secretaria vinculada y rechaza medico fuera de alcance', async () => {
+  const guard = requireDoctorOwnershipByParam()
+
+  const secretaryLinked = await runMiddleware(guard, {
+    auth: { role: 'secretary', doctorIds: ['doctor-1', 'doctor-2'] },
+    validated: { params: { id: 'doctor-2' } }
+  })
+  assert.equal(secretaryLinked, null)
+
+  const secretaryForbidden = await runMiddleware(guard, {
+    auth: { role: 'secretary', doctorIds: ['doctor-1'] },
+    validated: { params: { id: 'doctor-3' } }
+  })
+  assert.equal(secretaryForbidden?.code, 'forbidden')
+  assert.equal(secretaryForbidden?.statusCode, 403)
+})

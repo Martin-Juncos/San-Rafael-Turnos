@@ -94,7 +94,7 @@ export function useDoctorMessages ({
 
         if (previousKey !== undefined && nextKey !== previousKey) {
           const latest = result[result.length - 1]
-          if (latest && latest.senderRole !== 'doctor') {
+          if (latest && latest.senderRole === 'patient') {
             markConversationRead(selectedAppointmentId)
           }
         }
@@ -210,7 +210,7 @@ export function useDoctorMessages ({
     const isFreshForSession = Number.isFinite(latestCreatedAtMs) && latestCreatedAtMs > sessionStartedAtRef.current
     const hasNewMessage = previousKey !== undefined ? latestKey !== previousKey : isFreshForSession
 
-    if (latest && hasNewMessage && latest.senderRole !== 'doctor') {
+    if (latest && hasNewMessage && latest.senderRole === 'patient') {
       const senderLabel = latest.senderRole === 'patient' ? 'paciente' : 'clinica'
       nextUnread.add(appointment.id)
       nextAlert = {

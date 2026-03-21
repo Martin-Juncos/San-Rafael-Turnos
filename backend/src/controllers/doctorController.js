@@ -20,6 +20,7 @@ import {
   isoDateSchema,
   hhmmWithOptionalSecondsSchema
 } from '../validators/common.js'
+import { hasDoctorScopeAccess } from '../utils/doctorScope.js'
 
 const availabilityItemSchema = z.object({
   dayOfWeek: z.coerce.number().int().min(0).max(6),
@@ -120,7 +121,7 @@ const ensureDoctorReadPermission = (auth, doctorId) => {
   if (auth.role === 'admin' || auth.role === 'clinic') {
     return
   }
-  if (auth.role === 'doctor' && auth.doctorId === doctorId) {
+  if (hasDoctorScopeAccess(auth, doctorId)) {
     return
   }
   throw new AppError('Prohibido', 403, 'forbidden')

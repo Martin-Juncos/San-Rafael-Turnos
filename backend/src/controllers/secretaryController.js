@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs'
 import { Op } from 'sequelize'
 import { z } from 'zod'
-import { User, Doctor } from '../db/models/index.js'
+import { User, Doctor, sequelize } from '../db/models/index.js'
 import { AppError } from '../utils/errors.js'
 import { ok, paginated } from '../utils/response.js'
 import { parsePagination, buildPagination } from '../utils/pagination.js'
@@ -26,9 +26,10 @@ export const createSecretarySchema = z.object({
     email: z.string().email(),
     phone: phoneSchema,
     dni: dniSchema,
-    doctorId: z.string().uuid(),
+    doctorId: z.string().uuid().optional(),
+    doctorIds: z.array(z.string().uuid()).min(1).optional(),
     isActive: z.boolean().optional()
-  }),
+  }).refine((value) => Boolean(value.doctorId) || Boolean(value.doctorIds?.length), 'Debe vincular al menos un medico'),
   query: z.object({}).optional(),
   params: z.object({}).optional()
 })
@@ -48,6 +49,7 @@ export const updateSecretarySchema = z.object({
     phone: phoneSchema.optional(),
     dni: dniSchema.optional(),
     doctorId: z.string().uuid().optional(),
+    doctorIds: z.array(z.string().uuid()).min(1).optional(),
     isActive: z.boolean().optional()
   }).refine((value) => Object.keys(value).length > 0, 'Sin campos para actualizar'),
   query: z.object({}).optional(),
@@ -56,16 +58,41 @@ export const updateSecretarySchema = z.object({
   })
 })
 
+const secretaryInclude = [{
+  model: Doctor,
+  as: 'linkedDoctors',
+  through: { attributes: [] }
+}]
+
+const normalizeLinkedDoctorIds = ({ doctorId, doctorIds }) => {
+  return Array.from(
+    new Set([
+      ...(Array.isArray(doctorIds) ? doctorIds : []),
+      ...(doctorId ? [doctorId] : [])
+    ].filter(Boolean))
+  )
+}
+
+const assertDoctorsExist = async (doctorIds, transaction) => {
+  const doctors = await Doctor.findAll({
+    where: { id: doctorIds },
+    transaction
+  })
+
+  if (doctors.length !== doctorIds.length) {
+    throw new AppError('Uno o mas medicos no fueron encontrados', 404, 'doctor_not_found')
+  }
+
+  return doctors
+}
+
 export const listSecretaries = async (req, res) => {
   const { query = {} } = req.validated
   const { page, pageSize, offset, limit } = parsePagination(query)
 
   const where = {
-    role: 'doctor',
+    role: 'secretary',
     accountType: 'secretary'
-  }
-  if (query.doctorId) {
-    where.doctorId = query.doctorId
   }
   if (query.isActive) {
     where.isActive = query.isActive === 'true'
@@ -81,8 +108,19 @@ export const listSecretaries = async (req, res) => {
   const { rows, count } = await User.findAndCountAll({
     where,
     attributes: { exclude: ['passwordHash'] },
-    include: [{ model: Doctor, as: 'doctor' }],
+    include: [{
+      model: Doctor,
+      as: 'linkedDoctors',
+      through: { attributes: [] },
+      ...(query.doctorId
+        ? {
+            where: { id: query.doctorId },
+            required: true
+          }
+        : {})
+    }],
     order: [['fullName', 'ASC'], ['email', 'ASC']],
+    distinct: true,
     offset,
     limit
   })
@@ -91,32 +129,35 @@ export const listSecretaries = async (req, res) => {
 }
 
 export const createSecretary = async (req, res) => {
+  const linkedDoctorIds = normalizeLinkedDoctorIds(req.validated.body)
   const payload = {
     ...req.validated.body,
     fullName: req.validated.body.fullName.trim(),
     phone: normalizePhone(req.validated.body.phone),
-    dni: normalizeDni(req.validated.body.dni)
-  }
-
-  const doctor = await Doctor.findByPk(payload.doctorId)
-  if (!doctor) {
-    throw new AppError('Medico no encontrado', 404, 'doctor_not_found')
+    dni: normalizeDni(req.validated.body.dni),
+    doctorIds: linkedDoctorIds
   }
 
   const passwordHash = await bcrypt.hash(payload.dni, 10)
 
   let item
   try {
-    item = await User.create({
-      role: 'doctor',
-      accountType: 'secretary',
-      email: payload.email,
-      passwordHash,
-      doctorId: payload.doctorId,
-      fullName: payload.fullName,
-      phone: payload.phone,
-      dni: payload.dni,
-      isActive: payload.isActive ?? true
+    await sequelize.transaction(async (transaction) => {
+      await assertDoctorsExist(payload.doctorIds, transaction)
+
+      item = await User.create({
+        role: 'secretary',
+        accountType: 'secretary',
+        email: payload.email,
+        passwordHash,
+        doctorId: null,
+        fullName: payload.fullName,
+        phone: payload.phone,
+        dni: payload.dni,
+        isActive: payload.isActive ?? true
+      }, { transaction })
+
+      await item.setLinkedDoctors(payload.doctorIds, { transaction })
     })
   } catch (error) {
     if (error.name === 'SequelizeUniqueConstraintError') {
@@ -133,7 +174,7 @@ export const createSecretary = async (req, res) => {
     entityId: item.id,
     meta: {
       accountType: 'secretary',
-      doctorId: item.doctorId,
+      doctorIds: payload.doctorIds,
       email: item.email,
       fullName: item.fullName
     }
@@ -141,7 +182,7 @@ export const createSecretary = async (req, res) => {
 
   const created = await User.findByPk(item.id, {
     attributes: { exclude: ['passwordHash'] },
-    include: [{ model: Doctor, as: 'doctor' }]
+    include: secretaryInclude
   })
 
   ok(res, created, 'secretary_created', 201)
@@ -151,7 +192,7 @@ export const updateSecretary = async (req, res) => {
   const item = await User.findOne({
     where: {
       id: req.validated.params.id,
-      role: 'doctor',
+      role: 'secretary',
       accountType: 'secretary'
     }
   })
@@ -163,20 +204,27 @@ export const updateSecretary = async (req, res) => {
   if (patch.fullName) patch.fullName = patch.fullName.trim()
   if (patch.phone) patch.phone = normalizePhone(patch.phone)
   if (patch.dni) patch.dni = normalizeDni(patch.dni)
-
-  if (patch.doctorId) {
-    const doctor = await Doctor.findByPk(patch.doctorId)
-    if (!doctor) {
-      throw new AppError('Medico no encontrado', 404, 'doctor_not_found')
-    }
-  }
+  const linkedDoctorIds = normalizeLinkedDoctorIds(patch)
 
   if (patch.dni) {
     patch.passwordHash = await bcrypt.hash(patch.dni, 10)
   }
 
+  delete patch.doctorId
+  delete patch.doctorIds
+
   try {
-    await item.update(patch)
+    await sequelize.transaction(async (transaction) => {
+      if (linkedDoctorIds.length > 0) {
+        await assertDoctorsExist(linkedDoctorIds, transaction)
+      }
+
+      await item.update(patch, { transaction })
+
+      if (linkedDoctorIds.length > 0) {
+        await item.setLinkedDoctors(linkedDoctorIds, { transaction })
+      }
+    })
   } catch (error) {
     if (error.name === 'SequelizeUniqueConstraintError') {
       throw new AppError('Ya existe un usuario con ese correo', 409, 'secretary_conflict')
@@ -192,6 +240,7 @@ export const updateSecretary = async (req, res) => {
     entityId: item.id,
     meta: {
       accountType: 'secretary',
+      ...(linkedDoctorIds.length > 0 ? { doctorIds: linkedDoctorIds } : {}),
       ...patch,
       ...(patch.passwordHash ? { passwordHash: '[redacted]' } : {})
     }
@@ -199,7 +248,7 @@ export const updateSecretary = async (req, res) => {
 
   const updated = await User.findByPk(item.id, {
     attributes: { exclude: ['passwordHash'] },
-    include: [{ model: Doctor, as: 'doctor' }]
+    include: secretaryInclude
   })
 
   ok(res, updated, 'secretary_updated')
@@ -209,7 +258,7 @@ export const deleteSecretary = async (req, res) => {
   const item = await User.findOne({
     where: {
       id: req.validated.params.id,
-      role: 'doctor',
+      role: 'secretary',
       accountType: 'secretary'
     }
   })

@@ -21,7 +21,7 @@ export const buildDoctorPayload = ({ specialtyId, suffix = 'primary', overrides 
 
 export const buildStaffUserPayload = ({ role, suffix, doctorId = null }) => ({
   role,
-  accountType: role === 'doctor' ? 'doctor' : 'staff',
+  accountType: role === 'doctor' ? 'doctor' : (role === 'secretary' ? 'secretary' : 'staff'),
   email: `${role}.${suffix}.${Date.now()}@test.local`,
   passwordHash: `hash_${role}_${suffix}`,
   doctorId,
