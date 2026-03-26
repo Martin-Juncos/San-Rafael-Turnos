@@ -31,7 +31,7 @@ export function AppHeader () {
   }
 
   const navItemClassName = 'inline-flex items-center gap-1.5 text-base font-medium text-emerald-900/85 hover:text-emerald-950'
-  const mobileNavItemClassName = 'inline-flex items-center gap-2 rounded-xl border border-emerald-200/70 bg-white/70 px-3 py-2.5 text-sm font-medium text-emerald-900 transition hover:border-brand-300 hover:text-brand-700'
+  const mobileNavItemClassName = 'inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm font-medium text-emerald-950 shadow-sm transition hover:border-brand-300 hover:bg-emerald-50 hover:text-brand-700'
   const dashboardPath = auth.role ? rolePath[auth.role] : ''
 
   const isCurrentPage = (targetPath) => {
@@ -156,20 +156,20 @@ export function AppHeader () {
             <button
               type='button'
               aria-label='Cerrar menu'
-              className='absolute inset-0 bg-emerald-950/35 backdrop-blur-[1px]'
+              className='absolute inset-0 bg-emerald-950/40 backdrop-blur-[2px]'
               onClick={() => setIsMobileMenuOpen(false)}
             />
 
             <aside
               id='mobile-nav-menu'
-              className='absolute right-0 top-0 flex h-full w-80 max-w-[86vw] flex-col border-l border-emerald-200/70 bg-white/95 p-4 shadow-2xl backdrop-blur-xl'
+              className='absolute right-0 top-0 flex h-full w-80 max-w-[86vw] flex-col border-l border-emerald-200 bg-white p-4 shadow-2xl'
             >
               <div className='mb-4 flex items-center justify-between border-b border-emerald-200/70 pb-3'>
                 <p className='text-sm font-semibold text-emerald-950'>Menu</p>
                 <button
                   type='button'
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className='inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-200 bg-white/90 text-emerald-900'
+                  className='inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-900'
                   aria-label='Cerrar panel'
                 >
                   <X className='h-4 w-4' />
@@ -178,7 +178,7 @@ export function AppHeader () {
 
               {auth.role && identityLabel
                 ? (
-                  <p className='mb-3 rounded-xl border border-emerald-200/70 bg-emerald-50/70 px-3 py-2 text-sm font-medium text-emerald-900'>
+                  <p className='mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-950 shadow-sm'>
                     {identityLabel}
                   </p>
                   )
