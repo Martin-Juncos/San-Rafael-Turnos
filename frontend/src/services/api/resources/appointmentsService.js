@@ -12,6 +12,7 @@ export const appointmentsService = {
     return unwrapCollection(response)
   },
   getById: async (id) => unwrapData(await httpClient.get(`/appointments/${id}`)),
+  remove: async (id) => unwrapData(await httpClient.delete(`/appointments/${id}`)),
   update: async (id, payload) => unwrapData(await httpClient.patch(`/appointments/${id}`, payload)),
   cancel: async (id, reason) => unwrapData(await httpClient.post(`/appointments/${id}/cancel`, { reason })),
   reschedule: async (id, payload) => unwrapData(await httpClient.post(`/appointments/${id}/reschedule`, payload)),
@@ -21,4 +22,3 @@ export const appointmentsService = {
   listMessages: async (id) => unwrapData(await httpClient.get(`/appointments/${id}/messages`)),
   sendMessage: async (id, body) => unwrapData(await httpClient.post(`/appointments/${id}/messages`, { body }))
 }
-

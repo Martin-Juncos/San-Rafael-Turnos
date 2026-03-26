@@ -17,6 +17,13 @@ import { useDoctorAgenda } from './useDoctorAgenda'
 import { useDoctorFilters } from './useDoctorFilters'
 import { useDoctorMessages } from './useDoctorMessages'
 
+const describeDeleteTarget = (appointment) => {
+  if (!appointment) return ''
+  const patientName = appointment.patient?.fullName || 'Paciente sin nombre'
+  const time = (appointment.startTime || '').slice(0, 5)
+  return `${appointment.date} ${time} - ${patientName}`.trim()
+}
+
 export function useDoctorDashboardState () {
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
@@ -33,6 +40,11 @@ export function useDoctorDashboardState () {
     type: 'success',
     title: '',
     description: ''
+  })
+  const [deleteModal, setDeleteModal] = useState({
+    open: false,
+    appointmentId: '',
+    appointmentLabel: ''
   })
 
   const filters = useDoctorFilters()
@@ -94,6 +106,7 @@ export function useDoctorDashboardState () {
     selectedPrintDate: filters.selectedPrintDate,
     appointments: agenda.appointments,
     selectedAppointmentId: filters.selectedAppointmentId,
+    setSelectedAppointmentId: filters.setSelectedAppointmentId,
     selectedAppointment: agenda.selectedAppointment,
     managementForm: filters.managementForm,
     loadAppointments: agenda.loadAppointments,
@@ -118,6 +131,30 @@ export function useDoctorDashboardState () {
     doctorMessages.setIncomingAlert(null)
   }
 
+  const openDeleteModal = () => {
+    if (!agenda.selectedAppointment?.id) return
+    setDeleteModal({
+      open: true,
+      appointmentId: agenda.selectedAppointment.id,
+      appointmentLabel: describeDeleteTarget(agenda.selectedAppointment)
+    })
+  }
+
+  const closeDeleteModal = () => {
+    setDeleteModal({
+      open: false,
+      appointmentId: '',
+      appointmentLabel: ''
+    })
+  }
+
+  const confirmDeleteAppointment = async () => {
+    if (!deleteModal.appointmentId) return
+    const appointmentId = deleteModal.appointmentId
+    closeDeleteModal()
+    await actions.deleteAppointment(appointmentId)
+  }
+
   return {
     auth,
     isSecretary,
@@ -127,7 +164,9 @@ export function useDoctorDashboardState () {
     error,
     message,
     feedbackModal,
+    deleteModal,
     closeFeedbackModal,
+    closeDeleteModal,
     appointments: agenda.appointments,
     selectedAppointment: agenda.selectedAppointment,
     printableDates: agenda.printableDates,
@@ -148,9 +187,12 @@ export function useDoctorDashboardState () {
     markConversationRead: doctorMessages.markConversationRead,
     sendMessage: doctorMessages.sendMessage,
     savingManagement: actions.savingManagement,
+    deletingAppointment: actions.deletingAppointment,
     updateStatus: actions.updateStatus,
     markPaymentAsPaid: actions.markPaymentAsPaid,
     saveManagement: actions.saveManagement,
+    openDeleteModal,
+    confirmDeleteAppointment,
     openPrintDayView: actions.openPrintDayView,
     openReserveWithPrefill: actions.openReserveWithPrefill,
     openPatientRecords: actions.openPatientRecords,

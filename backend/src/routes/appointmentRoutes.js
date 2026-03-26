@@ -11,6 +11,7 @@ import {
   getAppointmentById,
   patchAppointment,
   cancelAppointment,
+  deleteAppointment,
   rescheduleAppointment,
   createAppointmentSchema,
   myAppointmentsSchema,
@@ -42,6 +43,13 @@ router.get('/my', authenticateJwt, requireRoles('patient'), validate(myAppointme
 router.get('/', authenticateJwt, validate(listAppointmentsSchema), asyncHandler(listAppointments))
 router.get('/:id', authenticateJwt, validate(appointmentIdSchema), asyncHandler(getAppointmentById))
 router.patch('/:id', authenticateJwt, validate(patchAppointmentSchema), asyncHandler(patchAppointment))
+router.delete(
+  '/:id',
+  authenticateJwt,
+  requireRoles('admin', 'clinic', 'doctor', 'secretary'),
+  validate(appointmentIdSchema),
+  asyncHandler(deleteAppointment)
+)
 router.post('/:id/cancel', authenticateJwt, validate(cancelAppointmentSchema), asyncHandler(cancelAppointment))
 router.post(
   '/:id/reschedule',

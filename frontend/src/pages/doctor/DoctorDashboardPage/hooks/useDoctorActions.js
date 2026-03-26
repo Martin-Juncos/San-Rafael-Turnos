@@ -11,6 +11,7 @@ export function useDoctorActions ({
   selectedPrintDate,
   appointments,
   selectedAppointmentId,
+  setSelectedAppointmentId,
   selectedAppointment,
   managementForm,
   loadAppointments,
@@ -18,6 +19,7 @@ export function useDoctorActions ({
   setMessage
 }) {
   const [savingManagement, setSavingManagement] = useState(false)
+  const [deletingAppointment, setDeletingAppointment] = useState(false)
 
   const updateStatus = async (appointmentId, status) => {
     setError('')
@@ -146,11 +148,34 @@ export function useDoctorActions ({
     navigate(`/dashboard/medico/consulta/${appointment.id}`)
   }
 
+  const deleteAppointment = async (appointmentId) => {
+    if (!appointmentId) return false
+
+    setError('')
+    setMessage('')
+    setDeletingAppointment(true)
+
+    try {
+      await appointmentsService.remove(appointmentId)
+      setSelectedAppointmentId('')
+      await loadAppointments()
+      setMessage('El turno fue eliminado definitivamente.')
+      return true
+    } catch (apiError) {
+      setError(apiError.message)
+      return false
+    } finally {
+      setDeletingAppointment(false)
+    }
+  }
+
   return {
     savingManagement,
+    deletingAppointment,
     updateStatus,
     markPaymentAsPaid,
     saveManagement,
+    deleteAppointment,
     openPrintDayView,
     openReserveWithPrefill,
     openPatientRecords,

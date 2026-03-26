@@ -4,7 +4,11 @@ import jwt from 'jsonwebtoken'
 import request from 'supertest'
 import { Op, QueryTypes } from 'sequelize'
 import { createDbTestHarness } from '../helpers/dbTestHarness.js'
-import { buildAppointmentRequestPayload, buildPatientPayload } from '../helpers/factories.js'
+import {
+  buildAppointmentRequestPayload,
+  buildPatientPayload,
+  buildStaffUserPayload
+} from '../helpers/factories.js'
 import { seedBaselineFixtures } from '../helpers/fixtures.js'
 
 const buildAccessToken = (claims) => {
@@ -21,6 +25,29 @@ const buildPatientAuthHeader = (patient) => buildAuthorizationHeader({
   patientId: patient.id,
   dni: patient.dni
 })
+const buildDoctorAuthHeader = (doctorUser, doctorId) => buildAuthorizationHeader({
+  sub: doctorUser.id,
+  role: 'doctor',
+  doctorId
+})
+
+const createAppointmentThroughApi = async ({ authHeader, fixtures, startTime = '09:00' }) => {
+  const appointmentPayload = buildAppointmentRequestPayload({
+    doctorId: fixtures.doctor.id,
+    specialtyId: fixtures.specialty.id,
+    date: fixtures.appointmentDate,
+    startTime,
+    patient: fixtures.patient
+  })
+
+  const createAppointmentResponse = await request(app)
+    .post('/api/appointments')
+    .set('Authorization', authHeader)
+    .send(appointmentPayload)
+
+  assert.equal(createAppointmentResponse.status, 201)
+  return createAppointmentResponse.body?.data?.appointment?.id
+}
 
 const harness = createDbTestHarness()
 let app
@@ -403,4 +430,167 @@ test('Pago mock real DB: pending -> paid y turno confirmado', async () => {
 
   assert.equal(getAppointmentResponse.status, 200)
   assert.equal(getAppointmentResponse.body?.data?.status, 'confirmed')
+})
+
+test('Eliminacion definitiva real DB: elimina turno y pago pendiente de forma fisica', async () => {
+  const patientAuth = buildPatientAuthHeader(fixtures.patient)
+  const doctorAuth = buildDoctorAuthHeader(fixtures.doctorUser, fixtures.doctor.id)
+  const appointmentId = await createAppointmentThroughApi({
+    authHeader: patientAuth,
+    fixtures,
+    startTime: '09:00'
+  })
+
+  const deleteResponse = await request(app)
+    .delete(`/api/appointments/${appointmentId}`)
+    .set('Authorization', doctorAuth)
+
+  assert.equal(deleteResponse.status, 200)
+  assert.equal(deleteResponse.body?.message, 'appointment_deleted')
+  assert.equal(deleteResponse.body?.data?.id, appointmentId)
+
+  const deletedAppointment = await models.Appointment.findByPk(appointmentId, {
+    paranoid: false
+  })
+  const deletedPayment = await models.Payment.findOne({
+    where: { appointmentId }
+  })
+
+  assert.equal(deletedAppointment, null)
+  assert.equal(deletedPayment, null)
+})
+
+test('Eliminacion definitiva real DB: bloquea borrado si el pago esta pagado', async () => {
+  const patientAuth = buildPatientAuthHeader(fixtures.patient)
+  const doctorAuth = buildDoctorAuthHeader(fixtures.doctorUser, fixtures.doctor.id)
+  const appointmentId = await createAppointmentThroughApi({
+    authHeader: patientAuth,
+    fixtures,
+    startTime: '09:30'
+  })
+
+  await models.Payment.update(
+    { status: 'paid' },
+    { where: { appointmentId } }
+  )
+
+  const deleteResponse = await request(app)
+    .delete(`/api/appointments/${appointmentId}`)
+    .set('Authorization', doctorAuth)
+
+  assert.equal(deleteResponse.status, 409)
+  assert.equal(deleteResponse.body?.error?.code, 'appointment_delete_protected_history')
+  assert.equal(deleteResponse.body?.error?.details?.hasPaidPayment, true)
+})
+
+test('Eliminacion definitiva real DB: bloquea borrado si existen mensajes', async () => {
+  const patientAuth = buildPatientAuthHeader(fixtures.patient)
+  const doctorAuth = buildDoctorAuthHeader(fixtures.doctorUser, fixtures.doctor.id)
+  const appointmentId = await createAppointmentThroughApi({
+    authHeader: patientAuth,
+    fixtures,
+    startTime: '10:00'
+  })
+
+  await models.Message.create({
+    appointmentId,
+    senderRole: 'patient',
+    body: 'Necesito confirmar la consulta.'
+  })
+
+  const deleteResponse = await request(app)
+    .delete(`/api/appointments/${appointmentId}`)
+    .set('Authorization', doctorAuth)
+
+  assert.equal(deleteResponse.status, 409)
+  assert.equal(deleteResponse.body?.error?.code, 'appointment_delete_protected_history')
+  assert.equal(deleteResponse.body?.error?.details?.hasMessages, true)
+})
+
+test('Eliminacion definitiva real DB: bloquea borrado si existe registro de consulta', async () => {
+  const patientAuth = buildPatientAuthHeader(fixtures.patient)
+  const doctorAuth = buildDoctorAuthHeader(fixtures.doctorUser, fixtures.doctor.id)
+  const appointmentId = await createAppointmentThroughApi({
+    authHeader: patientAuth,
+    fixtures,
+    startTime: '10:30'
+  })
+
+  await models.ConsultNote.create({
+    appointmentId,
+    doctorId: fixtures.doctor.id,
+    patientId: fixtures.patient.id,
+    subjective: 'Paciente refiere mejoria.',
+    objective: 'Sin hallazgos de alarma.',
+    assessment: 'Control favorable.',
+    plan: 'Continuar con seguimiento.',
+    followUp: 'Control en 30 dias.',
+    internalNotes: 'Nota interna de prueba.',
+    statusFinal: 'attended'
+  })
+
+  const deleteResponse = await request(app)
+    .delete(`/api/appointments/${appointmentId}`)
+    .set('Authorization', doctorAuth)
+
+  assert.equal(deleteResponse.status, 409)
+  assert.equal(deleteResponse.body?.error?.code, 'appointment_delete_protected_history')
+  assert.equal(deleteResponse.body?.error?.details?.hasConsultNote, true)
+})
+
+test('RBAC real DB: doctor y secretaria con scope pueden eliminar; paciente recibe 403', async () => {
+  const patientAuth = buildPatientAuthHeader(fixtures.patient)
+  const doctorAuth = buildDoctorAuthHeader(fixtures.doctorUser, fixtures.doctor.id)
+  const secretaryUser = await models.User.create(buildStaffUserPayload({
+    role: 'secretary',
+    suffix: 'linked-delete'
+  }))
+
+  await models.SecretaryDoctor.create({
+    secretaryUserId: secretaryUser.id,
+    doctorId: fixtures.doctor.id
+  })
+
+  const secretaryAuth = buildAuthorizationHeader({
+    sub: secretaryUser.id,
+    role: 'secretary',
+    doctorIds: [fixtures.doctor.id]
+  })
+
+  const doctorAppointmentId = await createAppointmentThroughApi({
+    authHeader: patientAuth,
+    fixtures,
+    startTime: '11:00'
+  })
+
+  const doctorDeleteResponse = await request(app)
+    .delete(`/api/appointments/${doctorAppointmentId}`)
+    .set('Authorization', doctorAuth)
+
+  assert.equal(doctorDeleteResponse.status, 200)
+
+  const secretaryAppointmentId = await createAppointmentThroughApi({
+    authHeader: patientAuth,
+    fixtures,
+    startTime: '11:30'
+  })
+
+  const secretaryDeleteResponse = await request(app)
+    .delete(`/api/appointments/${secretaryAppointmentId}`)
+    .set('Authorization', secretaryAuth)
+
+  assert.equal(secretaryDeleteResponse.status, 200)
+
+  const forbiddenAppointmentId = await createAppointmentThroughApi({
+    authHeader: patientAuth,
+    fixtures,
+    startTime: '09:00'
+  })
+
+  const patientDeleteResponse = await request(app)
+    .delete(`/api/appointments/${forbiddenAppointmentId}`)
+    .set('Authorization', patientAuth)
+
+  assert.equal(patientDeleteResponse.status, 403)
+  assert.equal(patientDeleteResponse.body?.error?.code, 'forbidden')
 })

@@ -1,4 +1,5 @@
 import { ActionResultModal } from '../../components/ui/ActionResultModal'
+import { DangerConfirmModal } from '../../components/ui/DangerConfirmModal'
 import { DoctorAgendaSection } from './DoctorDashboardPage/components/DoctorAgendaSection'
 import { DoctorDashboardHeader } from './DoctorDashboardPage/components/DoctorDashboardHeader'
 import { DoctorIncomingAlert } from './DoctorDashboardPage/components/DoctorIncomingAlert'
@@ -56,6 +57,8 @@ export function DoctorDashboardPage () {
           paymentStatusOptions={doctor.paymentStatusOptions}
           saveManagement={doctor.saveManagement}
           savingManagement={doctor.savingManagement}
+          openDeleteModal={doctor.openDeleteModal}
+          deletingAppointment={doctor.deletingAppointment}
           messages={doctor.messages}
           chatDraft={doctor.chatDraft}
           setChatDraft={doctor.setChatDraft}
@@ -69,6 +72,16 @@ export function DoctorDashboardPage () {
         title={doctor.feedbackModal.title}
         description={doctor.feedbackModal.description}
         onClose={doctor.closeFeedbackModal}
+      />
+
+      <DangerConfirmModal
+        open={doctor.deleteModal.open}
+        title='Eliminar turno definitivamente'
+        description={`Se eliminara en forma permanente el turno ${doctor.deleteModal.appointmentLabel}. Esta accion no se puede deshacer.`}
+        confirmLabel='Eliminar turno'
+        loading={doctor.deletingAppointment}
+        onClose={doctor.closeDeleteModal}
+        onConfirm={doctor.confirmDeleteAppointment}
       />
     </div>
   )

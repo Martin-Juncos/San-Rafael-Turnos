@@ -1,5 +1,11 @@
 import { Op } from 'sequelize'
-import { sequelize } from '../db/models/index.js'
+import {
+  sequelize,
+  Appointment,
+  Payment,
+  Message,
+  ConsultNote
+} from '../db/models/index.js'
 import { AppError } from '../utils/errors.js'
 import { addMinutesToTime } from '../utils/time.js'
 import { parsePagination, buildPagination } from '../utils/pagination.js'
@@ -15,11 +21,15 @@ import {
   createAppointmentRecord,
   createPaymentRecord,
   findActiveInsuranceById,
+  findAppointmentById,
   findAndCountAppointments,
   findOrCreatePatientByDni,
   findSpecialtyById
 } from '../repositories/appointmentRepository.js'
-import { hasPrivilegedRole } from '../utils/doctorScope.js'
+import {
+  hasDoctorScopeAccess,
+  hasPrivilegedRole
+} from '../utils/doctorScope.js'
 
 const defaultDependencies = {
   sequelize,
@@ -29,9 +39,34 @@ const defaultDependencies = {
   findOrCreatePatientByDni,
   findSpecialtyById,
   findActiveInsuranceById,
+  findAppointmentById,
+  findAppointmentForDelete: async ({ appointmentId, transaction, lock }) => {
+    return Appointment.findByPk(appointmentId, {
+      transaction,
+      lock
+    })
+  },
+  findAppointmentPayment: async ({ appointmentId, transaction }) => {
+    return Payment.findOne({
+      where: { appointmentId },
+      transaction
+    })
+  },
+  findAppointmentConsultNote: async ({ appointmentId, transaction }) => {
+    return ConsultNote.findOne({
+      where: { appointmentId },
+      transaction
+    })
+  },
   createAppointmentRecord,
   createPaymentRecord,
   createMockPaymentIntent,
+  countAppointmentMessages: async ({ appointmentId, transaction }) => {
+    return Message.count({
+      where: { appointmentId },
+      transaction
+    })
+  },
   writeAuditLog
 }
 
@@ -57,6 +92,32 @@ const assertCanCreateAppointment = ({ actorRole }) => {
     throw new AppError('Prohibido', 403, 'forbidden')
   }
 }
+
+const assertCanDeleteAppointment = ({ auth, appointment }) => {
+  if (!auth) {
+    throw new AppError('No autorizado', 401, 'unauthorized')
+  }
+
+  if (!['admin', 'clinic', 'doctor', 'secretary'].includes(auth.role)) {
+    throw new AppError('Prohibido', 403, 'forbidden')
+  }
+
+  if (hasPrivilegedRole(auth.role) || hasDoctorScopeAccess(auth, appointment.doctorId)) {
+    return
+  }
+
+  throw new AppError('Prohibido', 403, 'forbidden')
+}
+
+const buildDeleteProtectionDetails = ({
+  hasPaidPayment,
+  hasMessages,
+  hasConsultNote
+}) => ({
+  hasPaidPayment,
+  hasMessages,
+  hasConsultNote
+})
 
 const resolveAppointmentPricing = ({ specialty, insurance }) => {
   const baseAmount = Number(specialty.fee)
@@ -213,6 +274,89 @@ export const createAppointmentWithHold = async ({ payload, auth }, overrides = {
     payment,
     paymentIntent,
     pricing
+  }
+}
+
+export const deleteAppointmentPermanently = async ({ appointmentId, auth }, overrides = {}) => {
+  const deps = {
+    ...defaultDependencies,
+    ...overrides
+  }
+
+  let deletedAppointmentId = null
+
+  await deps.sequelize.transaction(async (transaction) => {
+    const appointment = await deps.findAppointmentForDelete({
+      appointmentId,
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    })
+
+    if (!appointment) {
+      throw new AppError('Turno no encontrado', 404, 'appointment_not_found')
+    }
+
+    assertCanDeleteAppointment({ auth, appointment })
+
+    const [payment, consultNote, messagesCount] = await Promise.all([
+      deps.findAppointmentPayment({
+        appointmentId: appointment.id,
+        transaction
+      }),
+      deps.findAppointmentConsultNote({
+        appointmentId: appointment.id,
+        transaction
+      }),
+      deps.countAppointmentMessages({
+        appointmentId: appointment.id,
+        transaction
+      })
+    ])
+
+    const protectionDetails = buildDeleteProtectionDetails({
+      hasPaidPayment: payment?.status === 'paid',
+      hasMessages: messagesCount > 0,
+      hasConsultNote: Boolean(consultNote)
+    })
+
+    if (protectionDetails.hasPaidPayment || protectionDetails.hasMessages || protectionDetails.hasConsultNote) {
+      throw new AppError(
+        'No se puede eliminar definitivamente un turno con historial asociado',
+        409,
+        'appointment_delete_protected_history',
+        protectionDetails
+      )
+    }
+
+    if (payment) {
+      await payment.destroy({ transaction })
+    }
+
+    deletedAppointmentId = appointment.id
+
+    await deps.writeAuditLog({
+      actorRole: auth.role,
+      actorId: auth.sub,
+      action: 'APPOINTMENT_DELETED',
+      entity: 'Appointment',
+      entityId: appointment.id,
+      meta: {
+        doctorId: appointment.doctorId,
+        patientId: appointment.patientId,
+        date: appointment.date,
+        startTime: appointment.startTime
+      },
+      transaction
+    })
+
+    await appointment.destroy({
+      transaction,
+      force: true
+    })
+  })
+
+  return {
+    id: deletedAppointmentId
   }
 }
 

@@ -79,7 +79,8 @@ export const openapiDocument = {
     },
     '/appointments/{id}': {
       get: { tags: ['Appointments'], summary: 'Obtener turno por id' },
-      patch: { tags: ['Appointments'], summary: 'Actualizar turno por permisos' }
+      patch: { tags: ['Appointments'], summary: 'Actualizar turno por permisos' },
+      delete: { tags: ['Appointments'], summary: 'Eliminar turno definitivamente (staff autorizado)' }
     },
     '/appointments/{id}/cancel': {
       post: { tags: ['Appointments'], summary: 'Cancelar turno' }

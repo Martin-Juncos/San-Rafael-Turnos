@@ -15,6 +15,8 @@ export function DoctorManagementPanel ({
   paymentStatusOptions,
   saveManagement,
   savingManagement,
+  openDeleteModal,
+  deletingAppointment,
   messages,
   chatDraft,
   setChatDraft,
@@ -99,9 +101,14 @@ export function DoctorManagementPanel ({
                 )
               : null}
 
-            <Button onClick={saveManagement} disabled={savingManagement}>
-              {savingManagement ? 'Guardando cambios...' : 'Guardar gestion'}
-            </Button>
+            <div className='flex flex-wrap gap-2'>
+              <Button onClick={saveManagement} disabled={savingManagement}>
+                {savingManagement ? 'Guardando cambios...' : 'Guardar gestion'}
+              </Button>
+              <Button variant='danger' onClick={openDeleteModal} disabled={deletingAppointment}>
+                {deletingAppointment ? 'Eliminando...' : 'Eliminar definitivamente'}
+              </Button>
+            </div>
           </div>
           )
         : (

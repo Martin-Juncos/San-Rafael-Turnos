@@ -21,6 +21,7 @@ import {
 import { writeAuditLog } from '../utils/audit.js'
 import {
   createAppointmentWithHold,
+  deleteAppointmentPermanently,
   listPatientAppointments,
   listScopedAppointments
 } from '../services/appointmentCrudService.js'
@@ -302,6 +303,15 @@ export const cancelAppointment = async (req, res) => {
   })
 
   ok(res, item, 'appointment_cancelled')
+}
+
+export const deleteAppointment = async (req, res) => {
+  const deleted = await deleteAppointmentPermanently({
+    appointmentId: req.validated.params.id,
+    auth: req.auth
+  })
+
+  ok(res, deleted, 'appointment_deleted')
 }
 
 export const rescheduleAppointment = async (req, res) => {
