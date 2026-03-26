@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { initMercadoPago, Wallet } from '@mercadopago/sdk-react'
 
 const publicKey = import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY || ''
@@ -11,11 +11,28 @@ export function MercadoPagoWallet ({
   onError,
   onSubmit
 }) {
+  const [walletReadyToRender, setWalletReadyToRender] = useState(false)
+
   useEffect(() => {
     if (!publicKey || mercadoPagoInitialized) return
     initMercadoPago(publicKey, { locale: 'es-AR' })
     mercadoPagoInitialized = true
   }, [])
+
+  useEffect(() => {
+    if (!preferenceId || !publicKey) {
+      setWalletReadyToRender(false)
+      return
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      setWalletReadyToRender(true)
+    })
+
+    return () => {
+      window.cancelAnimationFrame(frameId)
+    }
+  }, [preferenceId])
 
   if (!preferenceId) {
     return null
@@ -35,15 +52,24 @@ export function MercadoPagoWallet ({
       <p className='text-xs text-sky-900/80'>
         Usa el boton oficial de Mercado Pago para completar el pago del turno.
       </p>
-      <Wallet
-        initialization={{
-          preferenceId,
-          redirectMode: 'blank'
-        }}
-        onReady={onReady}
-        onError={onError}
-        onSubmit={onSubmit}
-      />
+      {walletReadyToRender
+        ? (
+          <Wallet
+            key={preferenceId}
+            initialization={{
+              preferenceId,
+              redirectMode: 'blank'
+            }}
+            onReady={onReady}
+            onError={onError}
+            onSubmit={onSubmit}
+          />
+          )
+        : (
+          <div className='rounded-lg border border-sky-200/70 bg-white/70 px-4 py-3 text-xs text-sky-900/75'>
+            Cargando boton seguro de Mercado Pago...
+          </div>
+          )}
     </div>
   )
 }
