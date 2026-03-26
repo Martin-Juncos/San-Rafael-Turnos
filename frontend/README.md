@@ -68,4 +68,4 @@ genera build de produccion.
 - Frontend local: `http://localhost:5173`
 - Backend local: `http://localhost:4000`
 - Si pruebas webhook real, el backend debe estar expuesto por `ngrok`.
-- El frontend no necesita URL publica para operar normalmente, pero el backend si la necesita para que Mercado Pago pueda notificar el webhook.
+- El frontend no necesita URL publica para operar normalmente, pero el backend si la necesita para que Mercado Pago pueda notificar el webhook. Atencion!
