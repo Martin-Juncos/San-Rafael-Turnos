@@ -1,0 +1,25 @@
+{
+  "name": "Clinica San Rafael Arcangel",
+  "short_name": "San Rafael",
+  "description": "Turnos online, especialidades medicas y pagos digitales de Clinica San Rafael Arcangel.",
+  "lang": "es-AR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#effff7",
+  "theme_color": "#144f33",
+  "icons": [
+    {
+      "src": "/icons/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

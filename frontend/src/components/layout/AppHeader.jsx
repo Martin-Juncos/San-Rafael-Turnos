@@ -55,7 +55,7 @@ export function AppHeader () {
             {!logoImageError
               ? (
                 <img
-                  src='/logo-san-rafael.png'
+                  src='/icons/logo-san-rafael.png'
                   alt='San Rafael Turnos'
                   className='h-full w-full object-contain'
                   onError={() => setLogoImageError(true)}

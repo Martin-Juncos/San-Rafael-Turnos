@@ -95,7 +95,7 @@ export function AboutPage () {
       <section className='glass-card space-y-4 p-6 sm:p-8'>
         <div className='flex flex-wrap items-center gap-4'>
           <img
-            src='/logo-san-rafael.png'
+            src='/icons/logo-san-rafael.png'
             alt='Logo Clinica San Rafael Arcangel'
             className='h-14 w-14 rounded-xl bg-white/70 object-contain p-1 ring-1 ring-emerald-200'
           />
