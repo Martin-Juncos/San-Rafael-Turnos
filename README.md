@@ -258,3 +258,5 @@ Notas de deploy:
 - WhatsApp real no integrado, solo mock.
 - Produccion base preparada para Render, pero faltan completar secretos, dominios y claves reales de terceros.
 - En desarrollo, el webhook requiere `ngrok` o una URL publica equivalente.
+
+Hecho por el Prof. Mercho con mucho 💖 y ☕
